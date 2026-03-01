@@ -13,8 +13,3 @@ type User struct {
 	IsActive  bool      `json:"is_active"`
 	CreatedAt time.Time `json:"created_at"`
 }
-
-type Credential struct {
-	ID           string `json:"-"`
-	PasswordHash string `json:"-"`
-}
