@@ -1,22 +1,20 @@
 package config
 
 import (
-	"database/sql"
+	"context"
 	"log"
 
-	_ "github.com/lib/pq"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-var DB *sql.DB
-
-func NewDB(dsn string) *sql.DB {
-	db, err := sql.Open("postgres", dsn)
+func NewDB(dsn string) *pgxpool.Pool {
+	db, err := pgxpool.New(context.Background(), dsn)
 	if err != nil {
 		log.Fatal("db open error:", err)
 		return nil
 	}
 
-	if err := db.Ping(); err != nil {
+	if err := db.Ping(context.Background()); err != nil {
 		log.Fatal("DB Ping error:- ", err)
 		return nil
 	}
