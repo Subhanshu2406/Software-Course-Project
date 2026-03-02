@@ -224,6 +224,138 @@ func (w *WAL) writeEntry(entry models.WALEntry) error {
 	return nil
 }
 
+// WriteCheckpoint records a checkpoint marker in the WAL.
+// The marker indicates that all entries up to lastLogID have been persisted
+// to the storage engine and don't need full replay on recovery.
+func (w *WAL) WriteCheckpoint(lastLogID uint64) error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	entry := models.WALEntry{
+		LogID:           w.nextLogID,
+		OpType:          constants.OpCheckpoint,
+		Timestamp:       time.Now(),
+		CheckpointLogID: lastLogID,
+	}
+
+	if err := w.writeEntry(entry); err != nil {
+		return err
+	}
+
+	w.nextLogID++
+	return nil
+}
+
+// ReadFrom reads WAL entries starting at or after the given log ID.
+// Used during recovery to skip already-checkpointed entries.
+func (w *WAL) ReadFrom(startLogID uint64) ([]models.WALEntry, error) {
+	all, err := w.ReadAll()
+	if err != nil {
+		return nil, err
+	}
+
+	var result []models.WALEntry
+	for _, entry := range all {
+		if entry.LogID >= startLogID {
+			result = append(result, entry)
+		}
+	}
+	return result, nil
+}
+
+// Truncate removes all WAL entries before the given log ID by rewriting the file.
+// Called after a successful checkpoint to prevent unbounded WAL growth.
+func (w *WAL) Truncate(beforeLogID uint64) error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	// Flush buffered writes
+	if err := w.writer.Flush(); err != nil {
+		return fmt.Errorf("wal: flush before truncate failed: %w", err)
+	}
+
+	// Read all entries
+	if _, err := w.file.Seek(0, 0); err != nil {
+		return fmt.Errorf("wal: seek failed: %w", err)
+	}
+
+	var keep []models.WALEntry
+	scanner := bufio.NewScanner(w.file)
+	for scanner.Scan() {
+		line := scanner.Bytes()
+		if len(line) == 0 {
+			continue
+		}
+		var entry models.WALEntry
+		if err := json.Unmarshal(line, &entry); err != nil {
+			return fmt.Errorf("wal: decode failed during truncate: %w", err)
+		}
+		if entry.LogID >= beforeLogID {
+			keep = append(keep, entry)
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return fmt.Errorf("wal: scan error during truncate: %w", err)
+	}
+
+	// Close old file
+	w.file.Close()
+
+	// Write kept entries to a temp file, then rename for atomicity
+	tmpPath := w.filePath + ".truncate.tmp"
+	tmpFile, err := os.Create(tmpPath)
+	if err != nil {
+		return fmt.Errorf("wal: create temp file failed: %w", err)
+	}
+	tmpWriter := bufio.NewWriter(tmpFile)
+	for _, entry := range keep {
+		data, err := json.Marshal(entry)
+		if err != nil {
+			tmpFile.Close()
+			os.Remove(tmpPath)
+			return fmt.Errorf("wal: marshal during truncate failed: %w", err)
+		}
+		if _, err := tmpWriter.Write(data); err != nil {
+			tmpFile.Close()
+			os.Remove(tmpPath)
+			return fmt.Errorf("wal: write during truncate failed: %w", err)
+		}
+		if err := tmpWriter.WriteByte('\n'); err != nil {
+			tmpFile.Close()
+			os.Remove(tmpPath)
+			return fmt.Errorf("wal: write newline during truncate failed: %w", err)
+		}
+	}
+	if err := tmpWriter.Flush(); err != nil {
+		tmpFile.Close()
+		os.Remove(tmpPath)
+		return fmt.Errorf("wal: flush during truncate failed: %w", err)
+	}
+	if err := tmpFile.Sync(); err != nil {
+		tmpFile.Close()
+		os.Remove(tmpPath)
+		return fmt.Errorf("wal: fsync during truncate failed: %w", err)
+	}
+	tmpFile.Close()
+
+	// Atomic rename
+	if err := os.Rename(tmpPath, w.filePath); err != nil {
+		return fmt.Errorf("wal: rename during truncate failed: %w", err)
+	}
+
+	// Reopen the WAL file
+	f, err := os.OpenFile(w.filePath, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0644)
+	if err != nil {
+		return fmt.Errorf("wal: reopen after truncate failed: %w", err)
+	}
+	w.file = f
+	w.writer = bufio.NewWriter(f)
+
+	return nil
+}
+
+// --- internal helpers ---
+
 // countEntries reads the file to count existing entries (used on startup).
 func (w *WAL) countEntries() (int, error) {
 	if _, err := w.file.Seek(0, 0); err != nil {

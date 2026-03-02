@@ -1,15 +1,16 @@
 // Package server implements the shard node's transaction execution logic.
 //
-// For Sprint 1 this is a single-node shard (no replication yet).
 // It implements Algorithm 1 from the report:
 //   Single-Shard Transaction Execution:
 //   1. Validate balance
 //   2. Append (txnID, operation, UNCOMMITTED) to WAL
-//   3. Apply debit and credit to ledger state   ← only after WAL fsync
-//   4. Mark COMMITTED in WAL
-//   5. Return SUCCESS
+//   3. Replicate WAL entry to followers (wait for quorum ACK)
+//   4. Apply debit and credit to ledger state
+//   5. Mark COMMITTED in WAL
+//   6. Return SUCCESS
 //
-// Replication (quorum ACK before commit) is added in Sprint 4.
+// Replication is optional — if no replicator is set, the shard operates
+// in leader-only mode (quorum of 1).
 package server
 
 import (
@@ -22,6 +23,7 @@ import (
 	"ledger-service/shard/ledger"
 	"ledger-service/shard/recovery"
 	"ledger-service/shard/wal"
+	"ledger-service/storage"
 )
 
 // ShardServer is the core of a shard node.
@@ -31,6 +33,7 @@ type ShardServer struct {
 	shardID string
 	walLog  *wal.WAL
 	ledger  *ledger.Ledger
+	store   storage.Engine // optional persistent storage (nil = in-memory only)
 
 	// seenTxns tracks transaction IDs to enforce idempotency.
 	// If a txnID is re-submitted (e.g. due to coordinator retry), we return
@@ -40,6 +43,7 @@ type ShardServer struct {
 
 // NewShardServer creates a new shard server, replaying the WAL if one exists.
 // walPath is the path to the WAL file (will be created if it doesn't exist).
+// initialBalances are persisted to the WAL on first startup so they survive recovery.
 func NewShardServer(shardID, walPath string, initialBalances map[string]int64) (*ShardServer, error) {
 	// Open (or create) the WAL
 	w, err := wal.Open(walPath)
@@ -47,16 +51,25 @@ func NewShardServer(shardID, walPath string, initialBalances map[string]int64) (
 		return nil, fmt.Errorf("shard %s: failed to open WAL: %w", shardID, err)
 	}
 
-	// Create the in-memory ledger
-	var l *ledger.Ledger
-	if len(initialBalances) > 0 {
-		l, err = ledger.NewLedgerWithAccounts(initialBalances)
-		if err != nil {
-			w.Close()
-			return nil, fmt.Errorf("shard %s: failed to create ledger: %w", shardID, err)
+	// Always start with an empty ledger — recovery will populate it from the WAL.
+	// This single-source-of-truth approach avoids inconsistencies between
+	// pre-populated balances and WAL replay.
+	l := ledger.NewLedger()
+
+	// On first startup (WAL is empty), persist initial balances as CREATE_ACCOUNT
+	// entries so they are available for future crash recovery.
+	if len(initialBalances) > 0 && w.NextLogID() == 0 {
+		initTxnID := "__init__"
+		for accountID, balance := range initialBalances {
+			if _, err := w.Append(initTxnID, constants.OpCreateAccount, accountID, balance); err != nil {
+				w.Close()
+				return nil, fmt.Errorf("shard %s: failed to log initial balance for %s: %w", shardID, accountID, err)
+			}
 		}
-	} else {
-		l = ledger.NewLedger()
+		if err := w.MarkCommitted(initTxnID); err != nil {
+			w.Close()
+			return nil, fmt.Errorf("shard %s: failed to commit initial balances: %w", shardID, err)
+		}
 	}
 
 	s := &ShardServer{
@@ -77,11 +90,59 @@ func NewShardServer(shardID, walPath string, initialBalances map[string]int64) (
 	for _, txnID := range result.PendingTxns {
 		s.seenTxns[txnID] = constants.StatePrepared
 	}
+	for _, txnID := range result.CommittedTxns {
+		s.seenTxns[txnID] = constants.StateCommitted
+	}
+	for _, txnID := range result.AbortedTxns {
+		s.seenTxns[txnID] = constants.StateAborted
+	}
 
 	log.Printf("shard %s: started — WAL recovery applied=%d skipped=%d pending=%d",
 		shardID, result.AppliedCount, result.SkippedCount, len(result.PendingTxns))
 
 	return s, nil
+}
+
+// SetStorage attaches a persistent storage engine for checkpointing.
+// When set, the shard can periodically checkpoint ledger state to storage,
+// enabling faster recovery via checkpoint + partial WAL replay.
+func (s *ShardServer) SetStorage(store storage.Engine) {
+	s.store = store
+}
+
+// Checkpoint persists the current ledger state to storage and records
+// a checkpoint marker in the WAL. After checkpointing, WAL entries
+// before the checkpoint can be safely truncated.
+func (s *ShardServer) Checkpoint() error {
+	if s.store == nil {
+		return fmt.Errorf("shard %s: no storage engine configured", s.shardID)
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// Snapshot current balances
+	snapshot := s.ledger.Snapshot()
+
+	// Persist to storage
+	if err := s.store.BatchSetBalances(snapshot); err != nil {
+		return fmt.Errorf("shard %s: checkpoint storage write failed: %w", s.shardID, err)
+	}
+
+	// Record the checkpoint position in the WAL
+	lastLogID := s.walLog.NextLogID()
+	if err := s.walLog.WriteCheckpoint(lastLogID); err != nil {
+		return fmt.Errorf("shard %s: checkpoint WAL write failed: %w", s.shardID, err)
+	}
+
+	// Record checkpoint position in storage
+	if err := s.store.SetCheckpointLogID(lastLogID); err != nil {
+		return fmt.Errorf("shard %s: checkpoint log ID write failed: %w", s.shardID, err)
+	}
+
+	log.Printf("shard %s: checkpoint complete at log ID %d (%d accounts)",
+		s.shardID, lastLogID, len(snapshot))
+	return nil
 }
 
 // ExecuteSingleShard executes a transaction where both accounts are on this shard.

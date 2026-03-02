@@ -3,10 +3,15 @@
 // This implements Algorithm 5 from the project report:
 //   1. Read WAL sequentially from stable storage
 //   2. For each entry:
-//      - If COMMITTED → apply operation to ledger state
+//      - If CREATE_ACCOUNT → set initial balance directly
+//      - If COMMITTED debit/credit → accumulate net balance change
 //      - If PREPARED  → retain for coordinator reconciliation
 //      - Otherwise    → skip (uncommitted, abort)
-//   3. Reconstruct in-memory ledger state
+//   3. Apply accumulated balance deltas to reconstruct in-memory ledger state
+//
+// Uses a balance-accumulation strategy rather than replaying individual
+// ApplyDebit/ApplyCredit calls. This avoids the bug where a debit fails on
+// a zero-balance account during recovery from an empty ledger.
 //
 // Three crash scenarios handled (per Section VII.E of report):
 //   - Crash before flush:   entry absent from WAL → no state change needed
@@ -26,13 +31,16 @@ import (
 
 // RecoveryResult summarizes what happened during WAL replay.
 type RecoveryResult struct {
-	AppliedCount  int      // number of committed transactions replayed
+	AppliedCount  int      // number of committed operations replayed
 	SkippedCount  int      // uncommitted entries skipped
 	PendingTxns   []string // txnIDs in PREPARED state awaiting coordinator decision
+	CommittedTxns []string // txnIDs that were committed (for idempotency rebuild)
+	AbortedTxns   []string // txnIDs that were aborted (for idempotency rebuild)
 }
 
 // Recover replays the WAL to reconstruct ledger state after a crash.
-// It reads all entries in order and rebuilds the ledger from committed operations.
+// It reads all entries in order, accumulates net balance changes from committed
+// transactions, and applies them to the ledger.
 // Returns a RecoveryResult describing what was found and applied.
 func Recover(w *wal.WAL, l *ledger.Ledger) (*RecoveryResult, error) {
 	entries, err := w.ReadAll()
@@ -42,32 +50,53 @@ func Recover(w *wal.WAL, l *ledger.Ledger) (*RecoveryResult, error) {
 
 	log.Printf("recovery: found %d WAL entries to process", len(entries))
 
+	if len(entries) == 0 {
+		return &RecoveryResult{}, nil
+	}
+
 	result := &RecoveryResult{}
 
-	// First pass: build a map of txnID → final state
+	// First pass: build a map of txnID → final state.
 	// We need to know which transactions ultimately committed before applying ops.
 	finalState := buildFinalStateMap(entries)
 
-	// Track which accounts we've seen to rebuild the ledger
-	// We process ops in log order, applying only those whose txn committed.
+	// Populate committed/aborted txn lists for idempotency map rebuild.
+	for txnID, state := range finalState {
+		switch state {
+		case constants.StateCommitted:
+			result.CommittedTxns = append(result.CommittedTxns, txnID)
+		case constants.StateAborted:
+			result.AbortedTxns = append(result.AbortedTxns, txnID)
+		}
+	}
+
+	// Second pass: process entries.
+	// - CREATE_ACCOUNT entries set initial balances directly.
+	// - DEBIT/CREDIT entries are accumulated as deltas (avoids the
+	//   bug where ApplyDebit fails on a zero-balance recovery ledger).
+	// - PREPARED entries with no final decision are marked as pending.
+	balanceDeltas := make(map[string]int64)
+
 	for _, entry := range entries {
 		switch entry.OpType {
-		case constants.OpDebit:
+		case constants.OpCreateAccount:
 			state, known := finalState[entry.TxnID]
 			if !known || state != constants.StateCommitted {
-				// This debit belongs to an uncommitted or aborted transaction
 				result.SkippedCount++
 				continue
 			}
-			// Apply debit to ledger (creates account at 0 if it doesn't exist,
-			// then debits — this handles the case where the account was created
-			// in this same recovery session)
-			if err := ensureAccount(l, entry.AccountID); err != nil {
-				return nil, fmt.Errorf("recovery: ensure account %s: %w", entry.AccountID, err)
+			// Set initial balance directly — this creates the account
+			l.SetBalance(entry.AccountID, entry.Amount)
+			result.AppliedCount++
+
+		case constants.OpDebit:
+			state, known := finalState[entry.TxnID]
+			if !known || state != constants.StateCommitted {
+				result.SkippedCount++
+				continue
 			}
-			if err := l.ApplyDebit(entry.AccountID, entry.Amount); err != nil {
-				return nil, fmt.Errorf("recovery: apply debit for txn %s: %w", entry.TxnID, err)
-			}
+			// Accumulate debit as negative delta
+			balanceDeltas[entry.AccountID] -= entry.Amount
 			result.AppliedCount++
 
 		case constants.OpCredit:
@@ -76,12 +105,8 @@ func Recover(w *wal.WAL, l *ledger.Ledger) (*RecoveryResult, error) {
 				result.SkippedCount++
 				continue
 			}
-			if err := ensureAccount(l, entry.AccountID); err != nil {
-				return nil, fmt.Errorf("recovery: ensure account %s: %w", entry.AccountID, err)
-			}
-			if err := l.ApplyCredit(entry.AccountID, entry.Amount); err != nil {
-				return nil, fmt.Errorf("recovery: apply credit for txn %s: %w", entry.TxnID, err)
-			}
+			// Accumulate credit as positive delta
+			balanceDeltas[entry.AccountID] += entry.Amount
 			result.AppliedCount++
 
 		case constants.OpPrepared:
@@ -94,8 +119,8 @@ func Recover(w *wal.WAL, l *ledger.Ledger) (*RecoveryResult, error) {
 				log.Printf("recovery: txn %s is in PREPARED state — awaiting coordinator decision", entry.TxnID)
 			}
 
-		case constants.OpCommitted, constants.OpAborted:
-			// These are terminal markers — already handled in buildFinalStateMap.
+		case constants.OpCommitted, constants.OpAborted, constants.OpCheckpoint:
+			// Terminal markers and checkpoints — handled in buildFinalStateMap.
 			// Nothing to do here.
 
 		default:
@@ -104,8 +129,20 @@ func Recover(w *wal.WAL, l *ledger.Ledger) (*RecoveryResult, error) {
 		}
 	}
 
-	log.Printf("recovery: complete — applied=%d skipped=%d pending=%d",
-		result.AppliedCount, result.SkippedCount, len(result.PendingTxns))
+	// Apply accumulated balance deltas to the ledger.
+	// The ledger already has initial balances from CREATE_ACCOUNT entries;
+	// we now apply the net effect of all committed DEBIT/CREDIT operations.
+	for accountID, delta := range balanceDeltas {
+		currentBal, exists := l.GetBalance(accountID)
+		if !exists {
+			currentBal = 0
+		}
+		l.SetBalance(accountID, currentBal+delta)
+	}
+
+	log.Printf("recovery: complete — applied=%d skipped=%d pending=%d committed_txns=%d aborted_txns=%d",
+		result.AppliedCount, result.SkippedCount, len(result.PendingTxns),
+		len(result.CommittedTxns), len(result.AbortedTxns))
 
 	return result, nil
 }
@@ -130,7 +167,7 @@ func buildFinalStateMap(entries []models.WALEntry) map[string]constants.Transact
 			if _, exists := states[entry.TxnID]; !exists {
 				states[entry.TxnID] = constants.StatePrepared
 			}
-		case constants.OpDebit, constants.OpCredit:
+		case constants.OpDebit, constants.OpCredit, constants.OpCreateAccount:
 			if _, exists := states[entry.TxnID]; !exists {
 				states[entry.TxnID] = constants.StatePending
 			}
@@ -138,17 +175,4 @@ func buildFinalStateMap(entries []models.WALEntry) map[string]constants.Transact
 	}
 
 	return states
-}
-
-// ensureAccount creates an account with zero balance if it doesn't already exist.
-// During recovery, accounts may not exist yet if the ledger is freshly created.
-func ensureAccount(l *ledger.Ledger, accountID string) error {
-	if accountID == "" {
-		return nil
-	}
-	if !l.AccountExists(accountID) {
-		// Create with zero balance; the WAL replay will set the correct balance
-		return l.CreateAccount(accountID, 0)
-	}
-	return nil
 }

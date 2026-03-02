@@ -229,3 +229,30 @@ func (l *Ledger) AccountExists(accountID string) bool {
 	_, ok := l.balances[accountID]
 	return ok
 }
+
+// SetBalance directly sets the balance for an account, creating it if necessary.
+// Used ONLY during crash recovery where the WAL is the source of truth.
+// This bypasses normal validation since recovery replays known-good committed ops.
+func (l *Ledger) SetBalance(accountID string, balance int64) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.balances[accountID] = balance
+}
+
+// LoadBalances replaces all account balances from a snapshot.
+// Used when loading state from the storage engine on startup.
+func (l *Ledger) LoadBalances(balances map[string]int64) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.balances = make(map[string]int64, len(balances))
+	for id, bal := range balances {
+		l.balances[id] = bal
+	}
+}
+
+// AccountCount returns the number of accounts in the ledger.
+func (l *Ledger) AccountCount() int {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+	return len(l.balances)
+}
