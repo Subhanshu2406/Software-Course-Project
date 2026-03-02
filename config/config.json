@@ -1,0 +1,26 @@
+{
+  "cluster": {
+    "num_shards": 3,
+    "partitions_per_shard": 10,
+    "total_partitions": 30
+  },
+  "shard": {
+    "wal_dir": "./data/wal",
+    "data_dir": "./data/storage",
+    "replica_count": 2,
+    "quorum_size": 2
+  },
+  "replication": {
+    "heartbeat_interval_ms": 5000,
+    "heartbeat_miss_limit": 3
+  },
+  "coordinator": {
+    "listen_addr": ":8080",
+    "shard_map_path": "./config/shard_map.json"
+  },
+  "performance": {
+    "min_tps_per_shard": 100,
+    "single_shard_latency_p99_ms": 50,
+    "cross_shard_latency_p99_ms": 200
+  }
+}
