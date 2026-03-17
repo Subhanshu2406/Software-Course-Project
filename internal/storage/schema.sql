@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS credentials (
 CREATE TABLE IF NOT EXISTS accounts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL,
-    balance DECIMAL(19, 4) NOT NULL DEFAULT 0,
+    balance BIGINT NOT NULL DEFAULT 0,
     currency VARCHAR(3) NOT NULL DEFAULT 'INR',
     version INT DEFAULT 0,
     created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS transactions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     from_account_id UUID NOT NULL,
     to_account_id UUID NOT NULL,
-    amount DECIMAL(19, 4) NOT NULL,
+    amount BIGINT NOT NULL,
     type VARCHAR(50) NOT NULL CHECK (type IN ('transfer', 'deposit', 'withdrawal')),
     status VARCHAR(50) NOT NULL CHECK (status IN ('pending', 'success', 'failed')),
     created_at TIMESTAMPTZ DEFAULT NOW(),

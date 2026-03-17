@@ -42,28 +42,6 @@ func (r *PgxTransactionRepository) Create(ctx context.Context, transaction *doma
 	return nil
 }
 
-// CreateWithTx inserts a new transaction record within an existing DB transaction.
-// Use this instead of Create when you need the insert to be part of a larger
-// atomic operation (e.g. debit + credit + log all in one transaction).
-func (r *PgxTransactionRepository) CreateWithTx(ctx context.Context, tx pgx.Tx, transaction *domain.Transaction) error {
-	query := `
-		INSERT INTO transactions (id, from_account_id, to_account_id, amount, type, status, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)`
-	_, err := tx.Exec(ctx, query,
-		transaction.ID,
-		transaction.FromAccountID,
-		transaction.ToAccountID,
-		transaction.Amount,
-		transaction.Type,
-		transaction.Status,
-		transaction.CreatedAt,
-	)
-	if err != nil {
-		return fmt.Errorf("creating transaction within tx: %w", err)
-	}
-	return nil
-}
-
 // GetByID retrieves a single transaction by its ID.
 // Returns (nil, nil) if not found.
 func (r *PgxTransactionRepository) GetByID(ctx context.Context, transactionID string) (*domain.Transaction, error) {
