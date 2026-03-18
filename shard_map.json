@@ -1,0 +1,54 @@
+{
+  "partitions": {
+    "0": {
+      "shard_id": "shard1",
+      "address": "localhost:8081",
+      "role": "PRIMARY"
+    },
+    "1": {
+      "shard_id": "shard2",
+      "address": "localhost:8082",
+      "role": "PRIMARY"
+    },
+    "2": {
+      "shard_id": "shard1",
+      "address": "localhost:8081",
+      "role": "PRIMARY"
+    },
+    "3": {
+      "shard_id": "shard2",
+      "address": "localhost:8082",
+      "role": "PRIMARY"
+    },
+    "4": {
+      "shard_id": "shard1",
+      "address": "localhost:8081",
+      "role": "PRIMARY"
+    },
+    "5": {
+      "shard_id": "shard2",
+      "address": "localhost:8082",
+      "role": "PRIMARY"
+    },
+    "6": {
+      "shard_id": "shard1",
+      "address": "localhost:8081",
+      "role": "PRIMARY"
+    },
+    "7": {
+      "shard_id": "shard2",
+      "address": "localhost:8082",
+      "role": "PRIMARY"
+    },
+    "8": {
+      "shard_id": "shard1",
+      "address": "localhost:8081",
+      "role": "PRIMARY"
+    },
+    "9": {
+      "shard_id": "shard2",
+      "address": "localhost:8082",
+      "role": "PRIMARY"
+    }
+  }
+}
