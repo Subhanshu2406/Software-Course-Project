@@ -91,6 +91,10 @@ func (h *HTTPHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/execute", h.handleExecute)
 	mux.HandleFunc("/balance", h.handleBalance)
 	mux.HandleFunc("/health", h.handleHealth)
+	mux.HandleFunc("/metrics", h.handleMetrics)
+	mux.HandleFunc("/halt-partition", h.handleHaltPartition)
+	mux.HandleFunc("/receive-partition", h.handleReceivePartition)
+	mux.HandleFunc("/resume-partition", h.handleResumePartition)
 }
 
 // --- Handler implementations ---
@@ -202,6 +206,64 @@ func (h *HTTPHandler) handleHealth(w http.ResponseWriter, r *http.Request) {
 		Status:    "healthy",
 		Timestamp: time.Now().UTC().Format(time.RFC3339),
 	})
+}
+
+func (h *HTTPHandler) handleMetrics(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeErrorJSON(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	metrics := h.server.GetMetrics()
+	writeJSON(w, http.StatusOK, metrics)
+}
+
+func (h *HTTPHandler) handleHaltPartition(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		PartitionID int `json:"partition_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeErrorJSON(w, http.StatusBadRequest, "invalid body")
+		return
+	}
+	snapshot, err := h.server.HaltAndSnapshotPartition(req.PartitionID)
+	if err != nil {
+		writeErrorJSON(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"balances": snapshot,
+	})
+}
+
+func (h *HTTPHandler) handleReceivePartition(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		PartitionID int             `json:"partition_id"`
+		Balances    map[string]int64 `json:"balances"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeErrorJSON(w, http.StatusBadRequest, "invalid body")
+		return
+	}
+	if err := h.server.ReceivePartition(req.PartitionID, req.Balances); err != nil {
+		writeErrorJSON(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "received"})
+}
+
+func (h *HTTPHandler) handleResumePartition(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		PartitionID int `json:"partition_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeErrorJSON(w, http.StatusBadRequest, "invalid body")
+		return
+	}
+	if err := h.server.ResumePartition(req.PartitionID); err != nil {
+		writeErrorJSON(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "resumed"})
 }
 
 // --- helpers ---

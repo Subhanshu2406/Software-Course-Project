@@ -20,8 +20,11 @@ import (
 
 	"ledger-service/shared/constants"
 	"ledger-service/shared/models"
+	"ledger-service/shared/utils"
 	"ledger-service/shard/ledger"
+	"ledger-service/shard/partition"
 	"ledger-service/shard/recovery"
+	"ledger-service/shard/replication"
 	"ledger-service/shard/wal"
 	"ledger-service/storage"
 )
@@ -29,11 +32,14 @@ import (
 // ShardServer is the core of a shard node.
 // It owns a WAL and a Ledger and coordinates safe transaction execution.
 type ShardServer struct {
-	mu      sync.Mutex // serializes transaction execution within this shard
-	shardID string
-	walLog  *wal.WAL
-	ledger  *ledger.Ledger
-	store   storage.Engine // optional persistent storage (nil = in-memory only)
+	mu         sync.Mutex // serializes transaction execution within this shard
+	shardID    string
+	walLog     *wal.WAL
+	ledger     *ledger.Ledger
+	store      storage.Engine // optional persistent storage (nil = in-memory only)
+	replicator *replication.PrimaryReplicator
+	partMgr    *partition.Manager
+	mapper     *utils.PartitionMapper
 
 	// seenTxns tracks transaction IDs to enforce idempotency.
 	// If a txnID is re-submitted (e.g. due to coordinator retry), we return
@@ -110,6 +116,17 @@ func (s *ShardServer) SetStorage(store storage.Engine) {
 	s.store = store
 }
 
+// SetPartitioning sets the partition manager and mapper for dynamic migration.
+func (s *ShardServer) SetPartitioning(mgr *partition.Manager, mapper *utils.PartitionMapper) {
+	s.partMgr = mgr
+	s.mapper = mapper
+}
+
+// SetReplicator attaches a replicator to this shard.
+func (s *ShardServer) SetReplicator(replicator *replication.PrimaryReplicator) {
+	s.replicator = replicator
+}
+
 // Checkpoint persists the current ledger state to storage and records
 // a checkpoint marker in the WAL. After checkpointing, WAL entries
 // before the checkpoint can be safely truncated.
@@ -180,14 +197,26 @@ func (s *ShardServer) ExecuteSingleShard(txn models.Transaction) (models.Transac
 	// Step 2: Write DEBIT and CREDIT entries to WAL (UNCOMMITTED)
 	// This is the log-before-apply step. If we crash after this but before
 	// applying to the ledger, recovery will see no COMMITTED record and skip.
-	_, err := s.walLog.Append(txn.TxnID, constants.OpDebit, txn.Source, txn.Amount)
+	debitLogID, err := s.walLog.Append(txn.TxnID, constants.OpDebit, txn.Source, txn.Amount)
 	if err != nil {
 		return models.TransactionResult{}, fmt.Errorf("shard %s: WAL append debit failed: %w", s.shardID, err)
 	}
+	if s.replicator != nil {
+		err = s.replicator.Replicate(models.WALEntry{LogID: debitLogID, TxnID: txn.TxnID, OpType: constants.OpDebit, AccountID: txn.Source, Amount: txn.Amount})
+		if err != nil {
+			return models.TransactionResult{}, fmt.Errorf("shard %s: replication failed: %w", s.shardID, err)
+		}
+	}
 
-	_, err = s.walLog.Append(txn.TxnID, constants.OpCredit, txn.Destination, txn.Amount)
+	creditLogID, err := s.walLog.Append(txn.TxnID, constants.OpCredit, txn.Destination, txn.Amount)
 	if err != nil {
 		return models.TransactionResult{}, fmt.Errorf("shard %s: WAL append credit failed: %w", s.shardID, err)
+	}
+	if s.replicator != nil {
+		err = s.replicator.Replicate(models.WALEntry{LogID: creditLogID, TxnID: txn.TxnID, OpType: constants.OpCredit, AccountID: txn.Destination, Amount: txn.Amount})
+		if err != nil {
+			return models.TransactionResult{}, fmt.Errorf("shard %s: replication failed: %w", s.shardID, err)
+		}
 	}
 
 	// Step 3: Apply to ledger state (only AFTER WAL fsync, which happens inside Append)
@@ -267,9 +296,15 @@ func (s *ShardServer) CommitTransaction(txnID string, opType constants.Operation
 	}
 
 	// Log the actual operation before applying
-	_, err := s.walLog.Append(txnID, opType, accountID, amount)
+	logID, err := s.walLog.Append(txnID, opType, accountID, amount)
 	if err != nil {
 		return fmt.Errorf("shard %s: WAL commit-op failed: %w", s.shardID, err)
+	}
+	if s.replicator != nil {
+		err = s.replicator.Replicate(models.WALEntry{LogID: logID, TxnID: txnID, OpType: opType, AccountID: accountID, Amount: amount})
+		if err != nil {
+			return fmt.Errorf("shard %s: replication failed: %w", s.shardID, err)
+		}
 	}
 
 	// Apply to ledger
@@ -334,6 +369,61 @@ func (s *ShardServer) TotalBalance() int64 {
 // Snapshot returns a copy of all balances (for migration / testing).
 func (s *ShardServer) Snapshot() map[string]int64 {
 	return s.ledger.Snapshot()
+}
+
+// GetMetrics returns some mock CPU usage, and the number of seen txns as queue depth.
+func (s *ShardServer) GetMetrics() models.ShardMetrics {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return models.ShardMetrics{
+		ShardID:      s.shardID,
+		CPUUsage:     20.5,
+		TotalQPS:     100.0,
+		QueueDepth:   len(s.seenTxns), // using this as a proxy for load
+		ReplicationLag: 0,
+	}
+}
+
+// HaltAndSnapshotPartition stops processing for a partition and returns its balances.
+func (s *ShardServer) HaltAndSnapshotPartition(partitionID int) (map[string]int64, error) {
+	if s.partMgr == nil || s.mapper == nil {
+		return nil, fmt.Errorf("partition manager not configured")
+	}
+
+	if err := s.partMgr.HaltPartition(partitionID); err != nil {
+		return nil, err
+	}
+
+	balances := s.ledger.Snapshot()
+	partBalances := make(map[string]int64)
+
+	for acc, bal := range balances {
+		if s.mapper.GetPartition(acc) == partitionID {
+			partBalances[acc] = bal
+		}
+	}
+	return partBalances, nil
+}
+
+// ReceivePartition loads pre-existing balances into the ledger for a migrating partition.
+func (s *ShardServer) ReceivePartition(partitionID int, balances map[string]int64) error {
+	if s.partMgr == nil {
+		return fmt.Errorf("partition manager not configured")
+	}
+
+	for acc, bal := range balances {
+		s.ledger.SetBalance(acc, bal)
+	}
+	s.partMgr.AddPartition(partitionID)
+	return nil
+}
+
+// ResumePartition resumes processing for a partition.
+func (s *ShardServer) ResumePartition(partitionID int) error {
+	if s.partMgr == nil {
+		return fmt.Errorf("partition manager not configured")
+	}
+	return s.partMgr.ResumePartition(partitionID)
 }
 
 // ShardID returns this shard's identifier.
