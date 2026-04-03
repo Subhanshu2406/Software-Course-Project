@@ -354,6 +354,69 @@ services:
       timeout: 3s
       retries: 10
 
+  # ---- Fault Proxy ----
+  fault-proxy:
+    build:
+      context: .
+      args:
+        BINARY: fault-proxy
+    ports:
+      - "6060:6060"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6060/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ---- Prometheus ----
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.retention.time=7d"
+    depends_on:
+      coordinator:
+        condition: service_healthy
+
+  # ---- Grafana ----
+  grafana:
+    image: grafana/grafana:10.4.0
+    ports:
+      - "3001:3000"
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_SERVER_ROOT_URL: "http://localhost:3000/grafana/"
+      GF_SERVER_SERVE_FROM_SUB_PATH: "true"
+      GF_SECURITY_ALLOW_EMBEDDING: "true"
+      GF_AUTH_ANONYMOUS_ORG_NAME: "Main Org."
+      GF_SECURITY_COOKIE_SAMESITE: "none"
+    volumes:
+      - ./config/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./config/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+
+  # ---- Frontend (nginx + React SPA) ----
+  frontend:
+    build:
+      context: ./frontend
+    ports:
+      - "3000:80"
+    volumes:
+      - ./config/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      coordinator:
+        condition: service_healthy
+
 volumes:
   shard1-data:
   shard1a-data:
@@ -364,3 +427,5 @@ volumes:
   shard3-data:
   shard3a-data:
   shard3b-data:
+  prometheus-data:
+  grafana-data:

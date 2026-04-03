@@ -1,154 +1,34 @@
 {
-    "partitions":  {
-                       "11":  {
-                                  "role":  "PRIMARY",
-                                  "shard_id":  "shard2",
-                                  "address":  "shard2:8082"
-                              },
-                       "20":  {
-                                  "role":  "PRIMARY",
-                                  "shard_id":  "shard3",
-                                  "address":  "shard3:8083"
-                              },
-                       "12":  {
-                                  "role":  "PRIMARY",
-                                  "shard_id":  "shard2",
-                                  "address":  "shard2:8082"
-                              },
-                       "10":  {
-                                  "role":  "PRIMARY",
-                                  "shard_id":  "shard2",
-                                  "address":  "shard2:8082"
-                              },
-                       "17":  {
-                                  "role":  "PRIMARY",
-                                  "shard_id":  "shard2",
-                                  "address":  "shard2:8082"
-                              },
-                       "26":  {
-                                  "role":  "PRIMARY",
-                                  "shard_id":  "shard3",
-                                  "address":  "shard3:8083"
-                              },
-                       "13":  {
-                                  "role":  "PRIMARY",
-                                  "shard_id":  "shard2",
-                                  "address":  "shard2:8082"
-                              },
-                       "27":  {
-                                  "role":  "PRIMARY",
-                                  "shard_id":  "shard3",
-                                  "address":  "shard3:8083"
-                              },
-                       "18":  {
-                                  "role":  "PRIMARY",
-                                  "shard_id":  "shard2",
-                                  "address":  "shard2:8082"
-                              },
-                       "29":  {
-                                  "role":  "PRIMARY",
-                                  "shard_id":  "shard3",
-                                  "address":  "shard3:8083"
-                              },
-                       "23":  {
-                                  "role":  "PRIMARY",
-                                  "shard_id":  "shard3",
-                                  "address":  "shard3:8083"
-                              },
-                       "19":  {
-                                  "role":  "PRIMARY",
-                                  "shard_id":  "shard2",
-                                  "address":  "shard2:8082"
-                              },
-                       "1":  {
-                                 "role":  "PRIMARY",
-                                 "shard_id":  "shard1",
-                                 "address":  "shard1:8081"
-                             },
-                       "5":  {
-                                 "role":  "PRIMARY",
-                                 "shard_id":  "shard1",
-                                 "address":  "shard1:8081"
-                             },
-                       "4":  {
-                                 "role":  "PRIMARY",
-                                 "shard_id":  "shard1",
-                                 "address":  "shard1:8081"
-                             },
-                       "8":  {
-                                 "role":  "PRIMARY",
-                                 "shard_id":  "shard1",
-                                 "address":  "shard1:8081"
-                             },
-                       "3":  {
-                                 "role":  "PRIMARY",
-                                 "shard_id":  "shard1",
-                                 "address":  "shard1:8081"
-                             },
-                       "14":  {
-                                  "role":  "PRIMARY",
-                                  "shard_id":  "shard2",
-                                  "address":  "shard2:8082"
-                              },
-                       "22":  {
-                                  "role":  "PRIMARY",
-                                  "shard_id":  "shard3",
-                                  "address":  "shard3:8083"
-                              },
-                       "28":  {
-                                  "role":  "PRIMARY",
-                                  "shard_id":  "shard3",
-                                  "address":  "shard3:8083"
-                              },
-                       "25":  {
-                                  "role":  "PRIMARY",
-                                  "shard_id":  "shard3",
-                                  "address":  "shard3:8083"
-                              },
-                       "9":  {
-                                 "role":  "PRIMARY",
-                                 "shard_id":  "shard1",
-                                 "address":  "shard1:8081"
-                             },
-                       "15":  {
-                                  "role":  "PRIMARY",
-                                  "shard_id":  "shard2",
-                                  "address":  "shard2:8082"
-                              },
-                       "21":  {
-                                  "role":  "PRIMARY",
-                                  "shard_id":  "shard3",
-                                  "address":  "shard3:8083"
-                              },
-                       "24":  {
-                                  "role":  "PRIMARY",
-                                  "shard_id":  "shard3",
-                                  "address":  "shard3:8083"
-                              },
-                       "16":  {
-                                  "role":  "PRIMARY",
-                                  "shard_id":  "shard2",
-                                  "address":  "shard2:8082"
-                              },
-                       "7":  {
-                                 "role":  "PRIMARY",
-                                 "shard_id":  "shard1",
-                                 "address":  "shard1:8081"
-                             },
-                       "0":  {
-                                 "role":  "PRIMARY",
-                                 "shard_id":  "shard1",
-                                 "address":  "shard1:8081"
-                             },
-                       "2":  {
-                                 "role":  "PRIMARY",
-                                 "shard_id":  "shard1",
-                                 "address":  "shard1:8081"
-                             },
-                       "6":  {
-                                 "role":  "PRIMARY",
-                                 "shard_id":  "shard1",
-                                 "address":  "shard1:8081"
-                             }
-                   }
+  "partitions": {
+    "0": {"shard_id": "shard1", "address": "shard1:8081", "role": "PRIMARY"},
+    "1": {"shard_id": "shard1", "address": "shard1:8081", "role": "PRIMARY"},
+    "2": {"shard_id": "shard1", "address": "shard1:8081", "role": "PRIMARY"},
+    "3": {"shard_id": "shard1", "address": "shard1:8081", "role": "PRIMARY"},
+    "4": {"shard_id": "shard1", "address": "shard1:8081", "role": "PRIMARY"},
+    "5": {"shard_id": "shard1", "address": "shard1:8081", "role": "PRIMARY"},
+    "6": {"shard_id": "shard1", "address": "shard1:8081", "role": "PRIMARY"},
+    "7": {"shard_id": "shard1", "address": "shard1:8081", "role": "PRIMARY"},
+    "8": {"shard_id": "shard1", "address": "shard1:8081", "role": "PRIMARY"},
+    "9": {"shard_id": "shard1", "address": "shard1:8081", "role": "PRIMARY"},
+    "10": {"shard_id": "shard2", "address": "shard2:8082", "role": "PRIMARY"},
+    "11": {"shard_id": "shard2", "address": "shard2:8082", "role": "PRIMARY"},
+    "12": {"shard_id": "shard2", "address": "shard2:8082", "role": "PRIMARY"},
+    "13": {"shard_id": "shard2", "address": "shard2:8082", "role": "PRIMARY"},
+    "14": {"shard_id": "shard2", "address": "shard2:8082", "role": "PRIMARY"},
+    "15": {"shard_id": "shard2", "address": "shard2:8082", "role": "PRIMARY"},
+    "16": {"shard_id": "shard2", "address": "shard2:8082", "role": "PRIMARY"},
+    "17": {"shard_id": "shard2", "address": "shard2:8082", "role": "PRIMARY"},
+    "18": {"shard_id": "shard2", "address": "shard2:8082", "role": "PRIMARY"},
+    "19": {"shard_id": "shard2", "address": "shard2:8082", "role": "PRIMARY"},
+    "20": {"shard_id": "shard3", "address": "shard3:8083", "role": "PRIMARY"},
+    "21": {"shard_id": "shard3", "address": "shard3:8083", "role": "PRIMARY"},
+    "22": {"shard_id": "shard3", "address": "shard3:8083", "role": "PRIMARY"},
+    "23": {"shard_id": "shard3", "address": "shard3:8083", "role": "PRIMARY"},
+    "24": {"shard_id": "shard3", "address": "shard3:8083", "role": "PRIMARY"},
+    "25": {"shard_id": "shard3", "address": "shard3:8083", "role": "PRIMARY"},
+    "26": {"shard_id": "shard3", "address": "shard3:8083", "role": "PRIMARY"},
+    "27": {"shard_id": "shard3", "address": "shard3:8083", "role": "PRIMARY"},
+    "28": {"shard_id": "shard3", "address": "shard3:8083", "role": "PRIMARY"},
+    "29": {"shard_id": "shard3", "address": "shard3:8083", "role": "PRIMARY"}
+  }
 }
