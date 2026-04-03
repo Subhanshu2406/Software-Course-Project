@@ -95,6 +95,9 @@ func (h *HTTPHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/halt-partition", h.handleHaltPartition)
 	mux.HandleFunc("/receive-partition", h.handleReceivePartition)
 	mux.HandleFunc("/resume-partition", h.handleResumePartition)
+	mux.HandleFunc("/promote", h.handlePromote)
+	mux.HandleFunc("/log-index", h.handleLogIndex)
+	mux.HandleFunc("/create-account", h.handleCreateAccount)
 }
 
 // --- Handler implementations ---
@@ -278,4 +281,47 @@ func writeJSON(w http.ResponseWriter, status int, data interface{}) {
 
 func writeErrorJSON(w http.ResponseWriter, status int, message string) {
 	writeJSON(w, status, ErrorResponse{Error: message})
+}
+
+func (h *HTTPHandler) handlePromote(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeErrorJSON(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	h.server.Promote()
+	writeJSON(w, http.StatusOK, map[string]string{"status": "PROMOTED", "shard_id": h.server.ShardID()})
+}
+
+func (h *HTTPHandler) handleLogIndex(w http.ResponseWriter, r *http.Request) {
+	logID := h.server.WAL().NextLogID()
+	writeJSON(w, http.StatusOK, map[string]uint64{"last_log_id": logID})
+}
+
+func (h *HTTPHandler) handleCreateAccount(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeErrorJSON(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+
+	var req struct {
+		AccountID string `json:"account_id"`
+		Balance   int64  `json:"balance"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeErrorJSON(w, http.StatusBadRequest, fmt.Sprintf("invalid body: %s", err))
+		return
+	}
+
+	if req.AccountID == "" {
+		writeErrorJSON(w, http.StatusBadRequest, "account_id is required")
+		return
+	}
+
+	if err := h.server.CreateAccountWithWAL(req.AccountID, req.Balance); err != nil {
+		// Account may already exist — treat as idempotent success
+		writeJSON(w, http.StatusOK, map[string]string{"status": "exists", "account_id": req.AccountID})
+		return
+	}
+
+	writeJSON(w, http.StatusCreated, map[string]string{"status": "created", "account_id": req.AccountID})
 }

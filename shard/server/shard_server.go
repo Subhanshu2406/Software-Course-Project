@@ -40,6 +40,7 @@ type ShardServer struct {
 	replicator *replication.PrimaryReplicator
 	partMgr    *partition.Manager
 	mapper     *utils.PartitionMapper
+	role       string // "PRIMARY" or "FOLLOWER"
 
 	// seenTxns tracks transaction IDs to enforce idempotency.
 	// If a txnID is re-submitted (e.g. due to coordinator retry), we return
@@ -361,6 +362,27 @@ func (s *ShardServer) CreateAccount(accountID string, openingBalance int64) erro
 	return s.ledger.CreateAccount(accountID, openingBalance)
 }
 
+// CreateAccountWithWAL creates an account and records it in the WAL for recovery.
+func (s *ShardServer) CreateAccountWithWAL(accountID string, openingBalance int64) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if err := s.ledger.CreateAccount(accountID, openingBalance); err != nil {
+		return err
+	}
+
+	txnID := fmt.Sprintf("create-%s", accountID)
+	if _, err := s.walLog.Append(txnID, constants.OpCreateAccount, accountID, openingBalance); err != nil {
+		return fmt.Errorf("shard %s: WAL append create account failed: %w", s.shardID, err)
+	}
+	if err := s.walLog.MarkCommitted(txnID); err != nil {
+		return fmt.Errorf("shard %s: WAL commit create account failed: %w", s.shardID, err)
+	}
+
+	s.seenTxns[txnID] = constants.StateCommitted
+	return nil
+}
+
 // TotalBalance returns the sum of all balances (for invariant testing).
 func (s *ShardServer) TotalBalance() int64 {
 	return s.ledger.TotalBalance()
@@ -434,4 +456,31 @@ func (s *ShardServer) ShardID() string {
 // Close shuts down the shard server cleanly.
 func (s *ShardServer) Close() error {
 	return s.walLog.Close()
+}
+
+// SetRole sets the role of this shard server (PRIMARY or FOLLOWER).
+func (s *ShardServer) SetRole(role string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.role = role
+}
+
+// Role returns the current role of this shard server.
+func (s *ShardServer) Role() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.role
+}
+
+// WAL returns the underlying WAL (used by follower receiver setup).
+func (s *ShardServer) WAL() *wal.WAL {
+	return s.walLog
+}
+
+// Promote switches this shard from FOLLOWER to PRIMARY.
+func (s *ShardServer) Promote() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.role = "PRIMARY"
+	log.Printf("shard %s: promoted to PRIMARY", s.shardID)
 }
