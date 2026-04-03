@@ -1,0 +1,35 @@
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+
+scrape_configs:
+  - job_name: "coordinator"
+    metrics_path: /metrics/prometheus
+    static_configs:
+      - targets: ["coordinator:8080"]
+        labels:
+          service: coordinator
+          instance_id: coord1
+
+  - job_name: "shard"
+    metrics_path: /metrics/prometheus
+    static_configs:
+      - targets: ["shard1:8081"]
+        labels:
+          service: shard
+          shard_id: shard1
+      - targets: ["shard2:8082"]
+        labels:
+          service: shard
+          shard_id: shard2
+      - targets: ["shard3:8083"]
+        labels:
+          service: shard
+          shard_id: shard3
+
+  - job_name: "load-monitor"
+    metrics_path: /metrics/prometheus
+    static_configs:
+      - targets: ["load-monitor:8090"]
+        labels:
+          service: load-monitor
