@@ -201,6 +201,86 @@ See [TEST_REPORT.md](TEST_REPORT.md) for full details and metrics.
 
 ---
 
+## Session 3 — Frontend Integration, Observability & Full-Stack Deployment
+
+### Overview
+
+Integrated a React+Vite frontend (from Stitch AI design mockups), added Prometheus metrics scraping, Grafana dashboards, nginx reverse proxy, and a fault-injection proxy service. All wired into Docker Compose and starts with `make up`.
+
+### Backend API Additions
+
+| Endpoint | Service | Purpose |
+|----------|---------|---------|
+| `GET /wal?limit=50` | Shard | Returns recent WAL entries with total count and last checkpoint |
+| `GET /transactions?limit=25` | Shard | Returns recent transactions (ring buffer, cap 500) |
+| `GET /metrics` (enhanced) | Shard | Expanded ShardMetrics with 11 new fields (role, counters, uptime, accounts) |
+| `GET /metrics/prometheus` | Shard | Prometheus text exposition format (9 metrics) |
+| `GET /transactions?limit=50` | Coordinator | Returns recent transactions (ring buffer, cap 1000) |
+| `POST /transfer` | Coordinator | Synchronous transfer endpoint |
+| `GET /metrics/prometheus` | Coordinator | Prometheus text format (TPS, committed, aborted, uptime) |
+| `GET /migrations` | Load Monitor | Returns migration event history |
+| `GET /metrics/prometheus` | Load Monitor | Prometheus text format |
+| `POST /kill?container=X` | Fault Proxy | Kill a Docker container (allowlisted) |
+| `POST /restart?container=X` | Fault Proxy | Restart a Docker container |
+| `GET /status` | Fault Proxy | Returns running state of all containers |
+
+### New Services Added to Docker Compose
+
+| Service | Image / Build | Port | Purpose |
+|---------|--------------|------|---------|
+| `fault-proxy` | Build (Go) | 6060 | Docker container management for fault injection |
+| `prometheus` | prom/prometheus:v2.51.0 | 9090 | Metrics scraping from all services |
+| `grafana` | grafana/grafana:10.4.0 | 3001 | Dashboards with auto-provisioned datasource |
+| `frontend` | Build (Node+nginx) | 3000 | React SPA + nginx reverse proxy |
+
+### Frontend Application
+
+- **Framework**: React 18 + Vite 5 + Tailwind CSS 3
+- **Design System**: "The Kinetic Ledger" — dark theme matching Stitch AI mockups
+- **Pages**: Cluster Overview, Transactions Explorer, WAL Inspector, Shard Map, Metrics (Grafana embed), Replication Health, Load Monitor, Fault Injection, Submit Transfer
+- **Features**: Live polling (2-3s intervals), ClusterContext for shared state, client-side filtering, nginx reverse proxy to all backend services
+
+### Files Created (Session 3)
+
+| File | Purpose |
+|------|---------|
+| `cmd/fault-proxy/main.go` | Fault proxy service (Docker SDK v24) |
+| `config/prometheus.yml` | Prometheus scrape configuration |
+| `config/nginx.conf` | nginx reverse proxy for all services |
+| `config/grafana/dashboards/ledger-overview.json` | Pre-built Grafana dashboard (13 panels) |
+| `config/grafana/provisioning/datasources/prometheus.yml` | Auto-provision Prometheus datasource |
+| `config/grafana/provisioning/dashboards/ledger.yml` | Dashboard file provider config |
+| `frontend/package.json` | React+Vite project definition |
+| `frontend/vite.config.js` | Vite config with dev proxy |
+| `frontend/tailwind.config.js` | Design tokens matching Stitch mockups |
+| `frontend/Dockerfile` | Multi-stage Node build + nginx |
+| `frontend/index.html` | SPA entry with Google Fonts |
+| `frontend/src/main.jsx` | React entry point |
+| `frontend/src/App.jsx` | Router with 9 page routes |
+| `frontend/src/index.css` | Tailwind + custom component classes |
+| `frontend/src/api/client.js` | API client (all endpoints, token support) |
+| `frontend/src/hooks/usePolling.js` | Auto-refresh polling hook |
+| `frontend/src/context/ClusterContext.jsx` | Cluster-wide state provider |
+| `frontend/src/components/Layout.jsx` | Sidebar + header shell |
+| `frontend/src/pages/*.jsx` | 9 page components |
+
+### Files Modified (Session 3)
+
+| File | Changes |
+|------|---------|
+| `shared/models/wal_entry.go` | ShardMetrics expanded (15 fields), TxnSummary struct added |
+| `shard/server/shard_server.go` | Atomic counters, ring buffer, new methods |
+| `shard/server/http_handler.go` | 3 new routes, 4 new handlers |
+| `coordinator/consumer/consumer.go` | Ring buffer, 5 new methods |
+| `cmd/coordinator/main.go` | 3 new endpoint wirings |
+| `load-monitor/monitor.go` | MigrationEvent tracking, Prometheus metrics |
+| `cmd/load-monitor/main.go` | 2 new endpoint wirings |
+| `docker-compose.yml` | 4 new services, 2 new volumes |
+| `Makefile` | 6 new targets (frontend-dev, open, etc.) |
+| `go.mod` | Docker SDK v24 + transitive dependencies |
+
+---
+
 ## Current State
 
 The project is fully implemented and tested:
