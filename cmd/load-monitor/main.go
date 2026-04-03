@@ -50,6 +50,8 @@ func main() {
 		metrics := lm.GetMetrics()
 		json.NewEncoder(w).Encode(metrics)
 	})
+	mux.HandleFunc("/migrations", lm.HandleMigrations)
+	mux.HandleFunc("/metrics/prometheus", lm.HandlePrometheusMetrics)
 
 	log.Printf("Load Monitor listening on %s (poll=%s, threshold=%d)", addr, pollInterval, threshold)
 	if err := http.ListenAndServe(addr, mux); err != nil {

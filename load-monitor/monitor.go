@@ -21,6 +21,19 @@ type LoadMonitor struct {
 	metrics        map[string]models.ShardMetrics
 	thresholdDepth int
 	pollInterval   time.Duration
+	migrations     []MigrationEvent
+}
+
+// MigrationEvent tracks a single partition migration.
+type MigrationEvent struct {
+	PartitionID       int       `json:"partition_id"`
+	FromShard         string    `json:"from_shard"`
+	ToShard           string    `json:"to_shard"`
+	TriggeredAt       time.Time `json:"triggered_at"`
+	CompletedAt       time.Time `json:"completed_at"`
+	DurationMs        int64     `json:"duration_ms"`
+	TriggerQueueDepth int       `json:"trigger_queue_depth"`
+	Success           bool      `json:"success"`
 }
 
 // NewLoadMonitor creates a new load monitor.
@@ -99,12 +112,22 @@ func (m *LoadMonitor) checkHotspots() {
 
 // migratePartition halts one partition on hotShard, moves it to coolShard, and updates routing.
 func (m *LoadMonitor) migratePartition(hot shardmap.ShardInfo, cool shardmap.ShardInfo) {
+	startTime := time.Now()
+
 	// Pick the first partition assigned to hotShard
 	partitions := m.shardMap.GetPartitionsForShard(hot.ShardID)
 	if len(partitions) == 0 {
 		return
 	}
 	partID := partitions[0]
+
+	// Get trigger queue depth
+	m.mu.Lock()
+	triggerDepth := 0
+	if metrics, ok := m.metrics[hot.ShardID]; ok {
+		triggerDepth = metrics.QueueDepth
+	}
+	m.mu.Unlock()
 
 	// 1. Halt and Snapshot on hotShard
 	reqBody, _ := json.Marshal(map[string]int{"partition_id": partID})
@@ -142,9 +165,11 @@ func (m *LoadMonitor) migratePartition(hot shardmap.ShardInfo, cool shardmap.Sha
 	resp3, err := http.Post(fmt.Sprintf("http://%s/resume-partition", cool.Address), "application/json", bytes.NewBuffer(reqBody))
 	if err != nil || resp3.StatusCode != http.StatusOK {
 		log.Printf("monitor: resume-partition failed on %s", cool.ShardID)
+		m.recordMigration(partID, hot.ShardID, cool.ShardID, startTime, triggerDepth, false)
 	} else {
 		resp3.Body.Close()
 		log.Printf("monitor: successfully migrated partition %d to %s", partID, cool.ShardID)
+		m.recordMigration(partID, hot.ShardID, cool.ShardID, startTime, triggerDepth, true)
 	}
 }
 
@@ -164,4 +189,42 @@ func (m *LoadMonitor) GetMetrics() map[string]models.ShardMetrics {
 		result[k] = v
 	}
 	return result
+}
+
+func (m *LoadMonitor) recordMigration(partID int, from, to string, start time.Time, triggerDepth int, success bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	now := time.Now()
+	m.migrations = append(m.migrations, MigrationEvent{
+		PartitionID:       partID,
+		FromShard:         from,
+		ToShard:           to,
+		TriggeredAt:       start,
+		CompletedAt:       now,
+		DurationMs:        now.Sub(start).Milliseconds(),
+		TriggerQueueDepth: triggerDepth,
+		Success:           success,
+	})
+}
+
+// HandleMigrations returns migration history.
+func (m *LoadMonitor) HandleMigrations(w http.ResponseWriter, r *http.Request) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"migrations": m.migrations,
+	})
+}
+
+// HandlePrometheusMetrics returns load monitor metrics in Prometheus text format.
+func (m *LoadMonitor) HandlePrometheusMetrics(w http.ResponseWriter, r *http.Request) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	w.Header().Set("Content-Type", "text/plain; version=0.0.4")
+	for shardID, metrics := range m.metrics {
+		fmt.Fprintf(w, "monitor_queue_depth{shard=\"%s\"} %d\n", shardID, metrics.QueueDepth)
+		fmt.Fprintf(w, "monitor_tps{shard=\"%s\"} %.2f\n", shardID, metrics.TotalQPS)
+	}
+	fmt.Fprintf(w, "monitor_migration_total %d\n", len(m.migrations))
 }
