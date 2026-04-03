@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>LedgerOS | SRS Visualizer</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-error": "#690005",
+                        "inverse-on-surface": "#303032",
+                        "surface-container": "#201f21",
+                        "surface-variant": "#353437",
+                        "surface-tint": "#c0c1ff",
+                        "inverse-surface": "#e5e1e4",
+                        "surface-dim": "#131315",
+                        "surface": "#131315",
+                        "on-secondary-fixed": "#13144a",
+                        "on-secondary-container": "#b2b3f2",
+                        "primary-fixed": "#e1e0ff",
+                        "error": "#ffb4ab",
+                        "secondary-fixed-dim": "#c0c1ff",
+                        "surface-bright": "#39393b",
+                        "tertiary-fixed-dim": "#ffb783",
+                        "tertiary-container": "#d97721",
+                        "surface-container-lowest": "#0e0e10",
+                        "on-tertiary-fixed-variant": "#703700",
+                        "outline-variant": "#464554",
+                        "on-tertiary-container": "#452000",
+                        "on-tertiary": "#4f2500",
+                        "on-surface-variant": "#c7c4d7",
+                        "surface-container-highest": "#353437",
+                        "secondary-container": "#42447b",
+                        "surface-container-high": "#2a2a2c",
+                        "surface-container-low": "#1b1b1d",
+                        "secondary-fixed": "#e1e0ff",
+                        "on-secondary-fixed-variant": "#404178",
+                        "tertiary-fixed": "#ffdcc5",
+                        "background": "#131315",
+                        "on-background": "#e5e1e4",
+                        "primary-container": "#8083ff",
+                        "outline": "#908fa0",
+                        "on-tertiary-fixed": "#301400",
+                        "on-primary-container": "#0d0096",
+                        "on-secondary": "#292a60",
+                        "tertiary": "#ffb783",
+                        "error-container": "#93000a",
+                        "on-error-container": "#ffdad6",
+                        "on-primary-fixed": "#07006c",
+                        "on-primary": "#1000a9",
+                        "secondary": "#c0c1ff",
+                        "on-primary-fixed-variant": "#2f2ebe",
+                        "inverse-primary": "#494bd6",
+                        "primary": "#c0c1ff",
+                        "on-surface": "#e5e1e4",
+                        "primary-fixed-dim": "#c0c1ff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "fontFamily": {
+                        "headline": ["Inter"],
+                        "body": ["Inter"],
+                        "label": ["Inter"],
+                        "mono": ["JetBrains Mono"]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .data-flow-dot {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            background: #c0c1ff;
+            border-radius: 50%;
+            box-shadow: 0 0 8px #8083ff;
+        }
+        .mono-data { font-family: 'JetBrains Mono', monospace; }
+        .tonal-shift-no-borders { border: none !important; }
+        .glass-card {
+            background: rgba(53, 52, 55, 0.4);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(70, 69, 84, 0.15);
+        }
+    </style>
+</head>
+<body class="bg-background text-on-surface font-body selection:bg-primary/30">
+<div class="flex min-h-screen">
+<!-- SideNavBar -->
+<aside class="flex flex-col h-full sticky left-0 top-0 bg-[#1b1b1d] dark:bg-[#1b1b1d] h-screen w-[240px] border-r border-[#464554]/15 tonal-shift-no-borders flat-no-shadows z-50">
+<div class="p-6 flex items-center gap-3">
+<div class="w-8 h-8 bg-gradient-to-br from-primary to-primary-container rounded flex items-center justify-center">
+<span class="material-symbols-outlined text-on-primary-container text-lg">hexagon</span>
+</div>
+<div>
+<h1 class="text-xl font-bold tracking-tighter text-[#c0c1ff]">LedgerOS</h1>
+<p class="text-[10px] uppercase tracking-widest text-on-surface-variant">Cluster: Active</p>
+</div>
+</div>
+<nav class="flex-1 px-3 space-y-1 mt-4">
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-[#a1a1aa] hover:text-[#f4f4f5] hover:bg-[#201f21] transition-colors duration-200 font-sans text-sm font-medium tracking-wide" href="#">
+<span class="material-symbols-outlined">analytics</span>
+                    Node Health
+                </a>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-[#c0c1ff] font-bold border-r-2 border-[#6366f1] bg-[#201f21] font-sans text-sm tracking-wide" href="#">
+<span class="material-symbols-outlined">monitoring</span>
+                    Metrics
+                </a>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-[#a1a1aa] hover:text-[#f4f4f5] hover:bg-[#201f21] transition-colors duration-200 font-sans text-sm font-medium tracking-wide" href="#">
+<span class="material-symbols-outlined">grid_view</span>
+                    Clusters
+                </a>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-[#a1a1aa] hover:text-[#f4f4f5] hover:bg-[#201f21] transition-colors duration-200 font-sans text-sm font-medium tracking-wide" href="#">
+<span class="material-symbols-outlined">description</span>
+                    System Logs
+                </a>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-[#a1a1aa] hover:text-[#f4f4f5] hover:bg-[#201f21] transition-colors duration-200 font-sans text-sm font-medium tracking-wide" href="#">
+<span class="material-symbols-outlined">settings_input_component</span>
+                    Protocol Config
+                </a>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-[#a1a1aa] hover:text-[#f4f4f5] hover:bg-[#201f21] transition-colors duration-200 font-sans text-sm font-medium tracking-wide" href="#">
+<span class="material-symbols-outlined">account_balance</span>
+                    Governance
+                </a>
+</nav>
+<div class="p-4 border-t border-outline-variant/10">
+<button class="w-full py-2 px-4 rounded-md bg-gradient-to-br from-primary to-primary-container text-on-primary-container font-semibold text-xs uppercase tracking-tighter hover:opacity-90 active:scale-[0.98] transition-all">
+                    Run Invariant Check
+                </button>
+</div>
+<div class="px-3 py-4 space-y-1">
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-[#a1a1aa] hover:text-[#f4f4f5] hover:bg-[#201f21] transition-colors duration-200 font-sans text-xs" href="#">
+<span class="material-symbols-outlined text-green-500">fiber_manual_record</span>
+                    Health
+                </a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-[#a1a1aa] hover:text-[#f4f4f5] hover:bg-[#201f21] transition-colors duration-200 font-sans text-xs" href="#">
+<span class="material-symbols-outlined">settings</span>
+                    Settings
+                </a>
+</div>
+</aside>
+<!-- Main Content Canvas -->
+<main class="flex-1 flex flex-col min-w-0 overflow-auto bg-background">
+<!-- TopNavBar -->
+<header class="flex justify-between items-center w-full px-6 sticky top-0 z-40 bg-[#131315]/80 backdrop-blur-xl h-16 tonal-shift-no-borders flat-no-shadows">
+<div class="flex items-center gap-8">
+<span class="text-lg font-medium text-[#f4f4f5] tracking-tight">SRS Visualizer</span>
+<nav class="hidden md:flex items-center gap-6">
+<a class="text-[#a1a1aa] hover:text-[#c0c1ff] transition-all font-sans text-sm font-medium uppercase tracking-widest" href="#">Monitoring</a>
+<a class="text-[#c0c1ff] border-b-2 border-[#6366f1] pb-4 font-sans text-sm font-medium uppercase tracking-widest" href="#">Control</a>
+<a class="text-[#a1a1aa] hover:text-[#c0c1ff] transition-all font-sans text-sm font-medium uppercase tracking-widest" href="#">Insights</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-surface-container text-on-surface-variant text-xs mono-data">
+<span class="material-symbols-outlined text-sm">refresh</span>
+                        2s Refresh
+                    </div>
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-[#a1a1aa] cursor-pointer hover:text-white transition-colors">notifications</span>
+<div class="w-8 h-8 rounded-full bg-surface-container-highest flex items-center justify-center border border-outline-variant/20 overflow-hidden">
+<img alt="User Profile" class="w-full h-full object-cover" data-alt="close-up portrait of a professional system engineer in a tech environment with soft blue lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDQuUr3v43190o7vDT6AnR0_vo9unEk6awjtl-sKvQmtIcYTmeoPW4jpObZMPPa-RFiOKxi_ZyZZx41SDK9U5zyk8XrKlHxQNIHqbTUGgwBTzv2bXxL6mptApDdSz0i4bVjBlfPjBnzHSL4t9pRbCGu9i_mJ5_ywcrTFlHF0S1M7ZcmI0TLU8GQHg7JH3_ASSU7yMHMVHg5xs1jp-8X_QidFWb7fc2j_5vCnf08hQGhRjPUMqZ2xn7cE_1i_oqrKLWqhll-s5sTMQ"/>
+</div>
+</div>
+</div>
+</header>
+<div class="p-8 space-y-12 max-w-7xl mx-auto w-full">
+<!-- Section 1: System Architecture Diagram -->
+<section class="space-y-6">
+<div class="flex items-end justify-between">
+<div class="space-y-1">
+<span class="label-sm text-on-surface-variant uppercase tracking-widest text-[10px] font-bold">Protocol Foundation</span>
+<h2 class="text-3xl font-medium tracking-tight">System Architecture</h2>
+</div>
+<div class="flex items-center gap-2 text-primary text-xs mono-data bg-primary/10 px-3 py-1 rounded-full">
+<span class="relative flex h-2 w-2">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+<span class="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+</span>
+                            Live Ingress Stream
+                        </div>
+</div>
+<div class="relative w-full h-[400px] bg-surface-container-low rounded-xl overflow-hidden flex items-center justify-around px-12 group">
+<!-- Connecting Lines (SVG) -->
+<svg class="absolute inset-0 w-full h-full pointer-events-none opacity-20" preserveaspectratio="none">
+<path d="M150 200 H350" fill="none" stroke="url(#lineGrad)" stroke-width="2"></path>
+<path d="M450 200 H650" fill="none" stroke="url(#lineGrad)" stroke-width="2"></path>
+<path d="M750 200 Q850 200 850 150" fill="none" stroke="url(#lineGrad)" stroke-width="2"></path>
+<path d="M750 200 Q850 200 850 250" fill="none" stroke="url(#lineGrad)" stroke-width="2"></path>
+<defs>
+<lineargradient id="lineGrad" x1="0%" x2="100%" y1="0%" y2="0%">
+<stop offset="0%" style="stop-color:#c0c1ff;stop-opacity:0"></stop>
+<stop offset="50%" style="stop-color:#c0c1ff;stop-opacity:1"></stop>
+<stop offset="100%" style="stop-color:#c0c1ff;stop-opacity:0"></stop>
+</lineargradient>
+</defs>
+</svg>
+<!-- Components -->
+<div class="flex flex-col items-center gap-4 z-10 cursor-pointer group/node">
+<div class="w-20 h-20 rounded-xl glass-card flex items-center justify-center group-hover/node:bg-primary/20 transition-all">
+<span class="material-symbols-outlined text-3xl text-primary">hub</span>
+</div>
+<span class="text-xs font-semibold tracking-widest uppercase">API Gateway</span>
+</div>
+<div class="flex flex-col items-center gap-4 z-10 cursor-pointer group/node">
+<div class="w-24 h-24 rounded-xl bg-surface-container-highest flex items-center justify-center border border-outline-variant/30 group-hover/node:border-primary/50 transition-all">
+<span class="material-symbols-outlined text-4xl text-primary">dynamic_feed</span>
+</div>
+<span class="text-xs font-semibold tracking-widest uppercase">Kafka Stream</span>
+</div>
+<div class="flex flex-col items-center gap-4 z-10 cursor-pointer group/node">
+<div class="w-28 h-28 rounded-2xl glass-card flex items-center justify-center ring-2 ring-primary/20 group-hover/node:ring-primary transition-all">
+<span class="material-symbols-outlined text-5xl text-primary">settings_suggest</span>
+</div>
+<span class="text-xs font-semibold tracking-widest uppercase">Coordinator</span>
+</div>
+<div class="flex flex-col gap-8 z-10">
+<div class="flex items-center gap-4 cursor-pointer group/node">
+<div class="w-16 h-16 rounded-lg bg-surface-container flex items-center justify-center group-hover/node:bg-surface-variant transition-all">
+<span class="material-symbols-outlined text-2xl text-secondary">database</span>
+</div>
+<div class="flex flex-col">
+<span class="text-xs font-semibold tracking-widest uppercase">Shard Alpha</span>
+<span class="text-[10px] text-on-surface-variant mono-data">0x884...f2</span>
+</div>
+</div>
+<div class="flex items-center gap-4 cursor-pointer group/node">
+<div class="w-16 h-16 rounded-lg bg-surface-container flex items-center justify-center group-hover/node:bg-surface-variant transition-all">
+<span class="material-symbols-outlined text-2xl text-secondary">database</span>
+</div>
+<div class="flex flex-col">
+<span class="text-xs font-semibold tracking-widest uppercase">Shard Beta</span>
+<span class="text-[10px] text-on-surface-variant mono-data">0x12c...a4</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Section 2: Transaction Lifecycle (Bento Style) -->
+<section class="grid grid-cols-1 md:grid-cols-3 gap-6">
+<div class="md:col-span-2 space-y-6">
+<div class="flex items-center justify-between">
+<h3 class="text-2xl font-medium tracking-tight">Transaction Lifecycle</h3>
+<div class="flex p-1 bg-surface-container-low rounded-lg">
+<button class="px-4 py-1.5 text-xs font-semibold rounded bg-surface-container-highest text-primary shadow-sm transition-all">Single-Shard</button>
+<button class="px-4 py-1.5 text-xs font-semibold text-on-surface-variant hover:text-on-surface transition-all">Cross-Shard</button>
+</div>
+</div>
+<div class="relative p-8 bg-surface-container rounded-2xl min-h-[300px] flex items-center">
+<div class="grid grid-cols-4 w-full gap-4 relative">
+<!-- Step 1 -->
+<div class="space-y-4 text-center group">
+<div class="w-12 h-12 mx-auto rounded-full bg-primary/10 flex items-center justify-center text-primary border border-primary/20 group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined">edit_document</span>
+</div>
+<div class="space-y-1">
+<p class="text-xs font-bold uppercase tracking-tighter">Initiate</p>
+<p class="text-[10px] text-on-surface-variant px-2 leading-tight">Validation &amp; Request parsing</p>
+</div>
+</div>
+<!-- Step 2 -->
+<div class="space-y-4 text-center group">
+<div class="w-12 h-12 mx-auto rounded-full bg-secondary/10 flex items-center justify-center text-secondary border border-secondary/20 group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined">lock</span>
+</div>
+<div class="space-y-1">
+<p class="text-xs font-bold uppercase tracking-tighter">Locking</p>
+<p class="text-[10px] text-on-surface-variant px-2 leading-tight">Shard-level mutex acquisition</p>
+</div>
+</div>
+<!-- Step 3 -->
+<div class="space-y-4 text-center group">
+<div class="w-12 h-12 mx-auto rounded-full bg-tertiary/10 flex items-center justify-center text-tertiary border border-tertiary/20 group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined">rule</span>
+</div>
+<div class="space-y-1">
+<p class="text-xs font-bold uppercase tracking-tighter">Commit</p>
+<p class="text-[10px] text-on-surface-variant px-2 leading-tight">2PC or Single phase logic</p>
+</div>
+</div>
+<!-- Step 4 -->
+<div class="space-y-4 text-center group">
+<div class="w-12 h-12 mx-auto rounded-full bg-green-500/10 flex items-center justify-center text-green-500 border border-green-500/20 group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined">check_circle</span>
+</div>
+<div class="space-y-1">
+<p class="text-xs font-bold uppercase tracking-tighter">Finalize</p>
+<p class="text-[10px] text-on-surface-variant px-2 leading-tight">WAL persistence &amp; Response</p>
+</div>
+</div>
+<!-- Progress Line -->
+<div class="absolute top-6 left-0 w-full h-[1px] bg-outline-variant/20 -z-10"></div>
+<div class="absolute top-6 left-0 w-[75%] h-[1px] bg-gradient-to-r from-primary to-secondary -z-10 shadow-[0_0_10px_rgba(192,193,255,0.4)]"></div>
+</div>
+</div>
+</div>
+<!-- Key Numbers (Right Column) -->
+<div class="space-y-6">
+<h3 class="text-2xl font-medium tracking-tight">Requirement Metrics</h3>
+<div class="grid grid-cols-1 gap-4">
+<div class="p-5 bg-surface-container-low rounded-xl border-l-4 border-primary">
+<p class="text-[10px] uppercase tracking-widest text-on-surface-variant font-bold mb-2">Throughput</p>
+<div class="flex items-baseline gap-2">
+<span class="text-3xl font-mono-data tracking-tighter">15,000+</span>
+<span class="text-xs text-on-surface-variant">TPS</span>
+</div>
+<div class="mt-3 flex items-center gap-2 text-[10px] text-green-400">
+<span class="material-symbols-outlined text-xs">check_circle</span>
+                                    Target Met
+                                </div>
+</div>
+<div class="p-5 bg-surface-container-low rounded-xl border-l-4 border-secondary">
+<p class="text-[10px] uppercase tracking-widest text-on-surface-variant font-bold mb-2">P99 Latency</p>
+<div class="flex items-baseline gap-2">
+<span class="text-3xl font-mono-data tracking-tighter">120</span>
+<span class="text-xs text-on-surface-variant">ms</span>
+</div>
+<div class="mt-3 flex items-center gap-2 text-[10px] text-green-400">
+<span class="material-symbols-outlined text-xs">check_circle</span>
+                                    Steady State
+                                </div>
+</div>
+<div class="p-5 bg-surface-container-low rounded-xl border-l-4 border-tertiary">
+<p class="text-[10px] uppercase tracking-widest text-on-surface-variant font-bold mb-2">Quorum Config</p>
+<div class="flex items-baseline gap-2">
+<span class="text-3xl font-mono-data tracking-tighter">3 / 5</span>
+<span class="text-xs text-on-surface-variant">Replicas</span>
+</div>
+<div class="mt-3 flex items-center gap-2 text-[10px] text-on-surface-variant">
+<span class="material-symbols-outlined text-xs">info</span>
+                                    Standard Raft
+                                </div>
+</div>
+</div>
+</div>
+</section>
+<!-- Section 3: 2PC Animation Interface -->
+<section class="p-8 bg-surface-container-lowest rounded-2xl border border-outline-variant/10">
+<div class="flex flex-col md:flex-row gap-12">
+<div class="flex-1 space-y-6">
+<div class="flex items-center gap-4">
+<h3 class="text-2xl font-medium tracking-tight">2-Phase Commit Protocol</h3>
+<div class="px-2 py-0.5 bg-primary/10 text-primary text-[10px] uppercase font-bold tracking-widest rounded">Visual Sequence</div>
+</div>
+<p class="text-sm text-on-surface-variant leading-relaxed">
+                                LedgerOS utilizes an optimized 2PC for atomic cross-shard state updates. Observe the sequence between the Coordinator and participant Shards below.
+                            </p>
+<!-- Sequence Controls -->
+<div class="flex items-center gap-4 pt-4">
+<button class="w-10 h-10 rounded-full bg-surface-container-highest flex items-center justify-center hover:bg-primary/20 transition-all">
+<span class="material-symbols-outlined">play_arrow</span>
+</button>
+<button class="w-10 h-10 rounded-full bg-surface-container-highest flex items-center justify-center hover:bg-primary/20 transition-all">
+<span class="material-symbols-outlined text-sm">skip_next</span>
+</button>
+<div class="h-1 flex-1 bg-surface-container rounded-full overflow-hidden">
+<div class="h-full w-1/3 bg-primary"></div>
+</div>
+<span class="text-xs mono-data text-on-surface-variant">Step 02/06</span>
+</div>
+</div>
+<div class="flex-1 bg-surface-container p-6 rounded-xl space-y-4 border border-outline-variant/20">
+<div class="flex justify-between px-4 pb-2 border-b border-outline-variant/10 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+<span>Coordinator</span>
+<span>Participants</span>
+</div>
+<div class="space-y-4 font-mono text-[11px] leading-tight">
+<div class="flex justify-between items-center opacity-40">
+<span class="text-primary">SEND_PREPARE</span>
+<div class="flex-1 border-t border-dashed border-outline-variant mx-4"></div>
+<span>...</span>
+</div>
+<div class="flex justify-between items-center bg-primary/5 p-2 rounded border border-primary/20">
+<span class="text-primary font-bold">ACK_PREPARE</span>
+<div class="flex-1 border-t border-primary/40 mx-4"></div>
+<span class="text-secondary">SHARD_B_OK</span>
+</div>
+<div class="flex justify-between items-center animate-pulse">
+<span class="text-on-surface-variant">COMMIT_WAIT</span>
+<div class="flex-1 border-t border-dashed border-outline-variant mx-4"></div>
+<span class="text-secondary">PROCESSED</span>
+</div>
+<div class="flex justify-between items-center opacity-20">
+<span>FINALIZE</span>
+<div class="flex-1 border-t border-dashed border-outline-variant mx-4"></div>
+<span>PENDING</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Section 4: WAL + Recovery Visualization -->
+<section class="space-y-8">
+<div class="space-y-2">
+<h3 class="text-2xl font-medium tracking-tight">WAL Persistence &amp; Recovery</h3>
+<p class="text-sm text-on-surface-variant">Durability guarantee through sequential Write-Ahead Logging.</p>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+<div class="relative h-[280px] bg-surface-container-low rounded-2xl flex items-center justify-center p-8 overflow-hidden">
+<!-- Background Grid -->
+<div class="absolute inset-0 opacity-[0.03]" style="background-image: radial-gradient(#c0c1ff 1px, transparent 1px); background-size: 20px 20px;"></div>
+<div class="relative w-full max-w-sm space-y-6">
+<!-- Memory State -->
+<div class="flex items-center gap-4 bg-surface-container p-4 rounded-lg border border-outline-variant/30">
+<div class="w-10 h-10 rounded bg-blue-500/20 flex items-center justify-center text-blue-400">
+<span class="material-symbols-outlined">memory</span>
+</div>
+<div class="flex-1 h-3 bg-surface-variant rounded-full overflow-hidden">
+<div class="h-full w-2/3 bg-blue-400"></div>
+</div>
+<span class="text-[10px] mono-data">RAM: 68%</span>
+</div>
+<!-- WAL Disk -->
+<div class="flex flex-col gap-2 p-4 bg-surface-container rounded-lg border border-primary/30 relative">
+<div class="flex items-center justify-between mb-2">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-sm">hard_drive</span>
+<span class="text-[10px] font-bold uppercase tracking-widest">WAL_Segment_094</span>
+</div>
+<span class="text-[10px] text-green-400">SYNCED</span>
+</div>
+<div class="flex gap-1.5 overflow-hidden">
+<div class="w-8 h-8 rounded bg-primary/20 shrink-0 border border-primary/40"></div>
+<div class="w-8 h-8 rounded bg-primary/20 shrink-0 border border-primary/40"></div>
+<div class="w-8 h-8 rounded bg-primary/20 shrink-0 border border-primary/40"></div>
+<div class="w-8 h-8 rounded bg-primary shrink-0 animate-pulse"></div>
+<div class="w-8 h-8 rounded bg-surface-variant shrink-0"></div>
+<div class="w-8 h-8 rounded bg-surface-variant shrink-0"></div>
+</div>
+<div class="absolute -right-2 -top-2">
+<span class="material-symbols-outlined text-red-500 animate-bounce">bolt</span>
+</div>
+</div>
+</div>
+</div>
+<div class="space-y-6 lg:pl-8">
+<div class="space-y-4">
+<div class="flex items-start gap-4">
+<div class="mt-1 w-5 h-5 rounded bg-error-container text-error flex items-center justify-center">
+<span class="material-symbols-outlined text-[14px]">warning</span>
+</div>
+<div>
+<h4 class="text-sm font-semibold">Crash Scenario Simulation</h4>
+<p class="text-xs text-on-surface-variant mt-1 leading-relaxed">System failure at T+450ms during multi-shard commit. Shards enter recovery mode using the last durable checkpoint.</p>
+</div>
+</div>
+<div class="flex items-start gap-4">
+<div class="mt-1 w-5 h-5 rounded bg-primary/20 text-primary flex items-center justify-center">
+<span class="material-symbols-outlined text-[14px]">history_edu</span>
+</div>
+<div>
+<h4 class="text-sm font-semibold">Log Replay Mechanism</h4>
+<p class="text-xs text-on-surface-variant mt-1 leading-relaxed">The coordinator scans the WAL for incomplete transactions and forces rollbacks or completions based on shard availability.</p>
+</div>
+</div>
+</div>
+<button class="px-6 py-2.5 rounded bg-surface-container-highest text-on-surface font-semibold text-xs uppercase tracking-widest hover:bg-surface-variant transition-colors flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">play_circle</span>
+                                Run Crash Demo
+                            </button>
+</div>
+</div>
+</section>
+</div>
+<!-- Footer Meta -->
+<footer class="mt-auto border-t border-outline-variant/10 p-8 flex flex-col md:flex-row justify-between items-center gap-4 text-on-surface-variant">
+<div class="flex items-center gap-2">
+<span class="text-[10px] font-bold uppercase tracking-[0.2em]">Cluster Core v4.1.2-Stable</span>
+</div>
+<div class="flex items-center gap-6">
+<a class="text-[10px] uppercase font-semibold hover:text-on-surface transition-colors" href="#">Documentation</a>
+<a class="text-[10px] uppercase font-semibold hover:text-on-surface transition-colors" href="#">API Spec</a>
+<a class="text-[10px] uppercase font-semibold hover:text-on-surface transition-colors" href="#">Github</a>
+</div>
+<div class="flex items-center gap-2 mono-data text-[10px]">
+<span class="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                    Systems Nominal: 124 Nodes Online
+                </div>
+</footer>
+</main>
+</div>
+</body></html>

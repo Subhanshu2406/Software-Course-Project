@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>LedgerOS | Fault Injection</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;family=JetBrains+Mono:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-error": "#690005",
+                        "inverse-on-surface": "#303032",
+                        "surface-container": "#201f21",
+                        "surface-variant": "#353437",
+                        "surface-tint": "#c0c1ff",
+                        "inverse-surface": "#e5e1e4",
+                        "surface-dim": "#131315",
+                        "surface": "#131315",
+                        "on-secondary-fixed": "#13144a",
+                        "on-secondary-container": "#b2b3f2",
+                        "primary-fixed": "#e1e0ff",
+                        "error": "#ffb4ab",
+                        "secondary-fixed-dim": "#c0c1ff",
+                        "surface-bright": "#39393b",
+                        "tertiary-fixed-dim": "#ffb783",
+                        "tertiary-container": "#d97721",
+                        "surface-container-lowest": "#0e0e10",
+                        "on-tertiary-fixed-variant": "#703700",
+                        "outline-variant": "#464554",
+                        "on-tertiary-container": "#452000",
+                        "on-tertiary": "#4f2500",
+                        "on-surface-variant": "#c7c4d7",
+                        "surface-container-highest": "#353437",
+                        "secondary-container": "#42447b",
+                        "surface-container-high": "#2a2a2c",
+                        "surface-container-low": "#1b1b1d",
+                        "secondary-fixed": "#e1e0ff",
+                        "on-secondary-fixed-variant": "#404178",
+                        "tertiary-fixed": "#ffdcc5",
+                        "background": "#131315",
+                        "on-background": "#e5e1e4",
+                        "primary-container": "#8083ff",
+                        "outline": "#908fa0",
+                        "on-tertiary-fixed": "#301400",
+                        "on-primary-container": "#0d0096",
+                        "on-secondary": "#292a60",
+                        "tertiary": "#ffb783",
+                        "error-container": "#93000a",
+                        "on-error-container": "#ffdad6",
+                        "on-primary-fixed": "#07006c",
+                        "on-primary": "#1000a9",
+                        "secondary": "#c0c1ff",
+                        "on-primary-fixed-variant": "#2f2ebe",
+                        "inverse-primary": "#494bd6",
+                        "primary": "#c0c1ff",
+                        "on-surface": "#e5e1e4",
+                        "primary-fixed-dim": "#c0c1ff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "fontFamily": {
+                        "headline": ["Inter"],
+                        "body": ["Inter"],
+                        "label": ["Inter"],
+                        "mono": ["JetBrains Mono"]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; background-color: #131315; color: #e5e1e4; }
+        .mono { font-family: 'JetBrains Mono', monospace; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .active-pill { font-variation-settings: 'FILL' 1; }
+        .danger-card-gradient { background: linear-gradient(135deg, #1b1b1d 0%, #201f21 100%); }
+        .glass-panel { backdrop-filter: blur(12px); background-color: rgba(53, 52, 55, 0.4); }
+    </style>
+</head>
+<body class="flex min-h-screen overflow-hidden">
+<!-- SideNavBar Component -->
+<aside class="flex flex-col h-full sticky left-0 top-0 h-screen w-[240px] border-r border-[#464554]/15 bg-[#1b1b1d] dark:bg-[#1b1b1d] z-50">
+<div class="p-6">
+<div class="flex items-center gap-3 mb-8">
+<div class="w-8 h-8 bg-primary rounded flex items-center justify-center">
+<span class="material-symbols-outlined text-on-primary-container" style="font-variation-settings: 'FILL' 1;">hexagon</span>
+</div>
+<div>
+<h1 class="text-xl font-bold tracking-tighter text-[#c0c1ff]">LedgerOS</h1>
+<p class="text-[10px] uppercase tracking-widest text-on-surface-variant">Cluster: Active</p>
+</div>
+</div>
+<nav class="space-y-1">
+<a class="flex items-center gap-3 px-3 py-2 text-[#a1a1aa] hover:text-[#f4f4f5] font-sans text-sm font-medium tracking-wide transition-colors duration-200 hover:bg-[#201f21]" href="#">
+<span class="material-symbols-outlined">analytics</span>
+                    Node Health
+                </a>
+<a class="flex items-center gap-3 px-3 py-2 text-[#a1a1aa] hover:text-[#f4f4f5] font-sans text-sm font-medium tracking-wide transition-colors duration-200 hover:bg-[#201f21]" href="#">
+<span class="material-symbols-outlined">monitoring</span>
+                    Metrics
+                </a>
+<a class="flex items-center gap-3 px-3 py-2 text-[#a1a1aa] hover:text-[#f4f4f5] font-sans text-sm font-medium tracking-wide transition-colors duration-200 hover:bg-[#201f21]" href="#">
+<span class="material-symbols-outlined">grid_view</span>
+                    Clusters
+                </a>
+<a class="flex items-center gap-3 px-3 py-2 text-[#a1a1aa] hover:text-[#f4f4f5] font-sans text-sm font-medium tracking-wide transition-colors duration-200 hover:bg-[#201f21]" href="#">
+<span class="material-symbols-outlined">description</span>
+                    System Logs
+                </a>
+<a class="flex items-center gap-3 px-3 py-2 text-[#c0c1ff] font-bold border-r-2 border-[#6366f1] bg-[#201f21] font-sans text-sm tracking-wide" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">settings_input_component</span>
+                    Protocol Config
+                </a>
+<a class="flex items-center gap-3 px-3 py-2 text-[#a1a1aa] hover:text-[#f4f4f5] font-sans text-sm font-medium tracking-wide transition-colors duration-200 hover:bg-[#201f21]" href="#">
+<span class="material-symbols-outlined">account_balance</span>
+                    Governance
+                </a>
+</nav>
+</div>
+<div class="mt-auto p-4 border-t border-outline-variant/10">
+<button class="w-full py-2 bg-primary-container text-on-primary-container rounded text-xs font-bold uppercase tracking-widest hover:opacity-90 active:scale-[0.98] transition-all">
+                Run Invariant Check
+            </button>
+<div class="mt-4 flex flex-col gap-1">
+<a class="flex items-center gap-3 px-3 py-2 text-[#a1a1aa] hover:text-[#f4f4f5] text-sm" href="#">
+<span class="material-symbols-outlined text-green-500" style="font-variation-settings: 'FILL' 1;">fiber_manual_record</span>
+                    Health
+                </a>
+<a class="flex items-center gap-3 px-3 py-2 text-[#a1a1aa] hover:text-[#f4f4f5] text-sm" href="#">
+<span class="material-symbols-outlined">settings</span>
+                    Settings
+                </a>
+</div>
+</div>
+</aside>
+<div class="flex-1 flex flex-col overflow-hidden bg-background">
+<!-- TopNavBar Component -->
+<header class="flex justify-between items-center w-full px-6 sticky top-0 z-40 bg-[#131315]/80 backdrop-blur-xl h-16">
+<div class="flex items-center gap-8">
+<span class="text-lg font-medium text-[#f4f4f5] font-sans">Fault Injection</span>
+<nav class="hidden md:flex gap-6">
+<a class="text-[#a1a1aa] hover:text-[#f4f4f5] font-sans text-sm font-medium uppercase tracking-widest transition-all" href="#">Monitoring</a>
+<a class="text-[#c0c1ff] border-b-2 border-[#6366f1] pb-4 font-sans text-sm font-medium uppercase tracking-widest" href="#">Control</a>
+<a class="text-[#a1a1aa] hover:text-[#f4f4f5] font-sans text-sm font-medium uppercase tracking-widest transition-all" href="#">Insights</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<div class="flex gap-2">
+<button class="p-2 text-on-surface-variant hover:text-primary transition-colors"><span class="material-symbols-outlined">refresh</span></button>
+<button class="p-2 text-on-surface-variant hover:text-primary transition-colors"><span class="material-symbols-outlined">notifications</span></button>
+</div>
+<div class="h-8 w-8 rounded-full overflow-hidden border border-outline-variant/30">
+<img class="h-full w-full object-cover" data-alt="close-up of a professional software engineer avatar with neutral expression in professional lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuASb8nZ3GbfhcILfzbAEOQy9o8TUviQQ7CCY8aqz2G8bmniFhVS8e7qfDWT4KGM0dOKSLcEI6qCVw0HvLLL2Qe3eGSzT660kebaH0hGwNvZIdlR2q2pKsn2MdQWBg9P85mZ_Vx7BCPmr5MdEYPX5r3cipdo7R5N0V5dmdlH7smh_aufgfLBg7xHm2FhR678WRfPLsqSUz9VwCr4Atj3dPKOkCbXTpkt634EhHTYVAWuZJsyIsqNFoCMIlgC4Nx3-16U6BfobhSKjg"/>
+</div>
+</div>
+</header>
+<main class="flex-1 overflow-y-auto p-6 space-y-8">
+<!-- Warning Banner -->
+<section class="relative overflow-hidden rounded-xl border border-tertiary/20 bg-tertiary-container/10 p-6 flex items-center gap-6">
+<div class="flex-shrink-0 w-12 h-12 rounded-full bg-tertiary/20 flex items-center justify-center animate-pulse">
+<span class="material-symbols-outlined text-tertiary text-3xl" style="font-variation-settings: 'FILL' 1;">warning</span>
+</div>
+<div class="flex-1">
+<h2 class="text-xl font-bold text-tertiary font-headline">CRITICAL ACCESS: Fault Injection Mode</h2>
+<p class="text-on-surface-variant text-sm mt-1 max-w-2xl">
+                        You are entering the system resilience testing environment. Actions performed here will cause deliberate state degradation. Ensure you are working in an isolated staging shard.
+                    </p>
+</div>
+<div class="flex flex-col items-end">
+<span class="label-sm text-[10px] uppercase tracking-widest text-tertiary opacity-70 mb-2">Session Safety</span>
+<div class="flex items-center gap-2">
+<span class="text-tertiary font-mono font-bold">STAGING_ENV_01</span>
+</div>
+</div>
+</section>
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+<!-- Left & Middle Column (Fault Controls) -->
+<div class="lg:col-span-2 space-y-10">
+<!-- Shard Failures -->
+<section>
+<div class="flex items-center justify-between mb-6">
+<h3 class="label-sm text-[11px] uppercase tracking-[0.2em] text-on-surface-variant font-bold">01. Shard Failures</h3>
+<span class="px-2 py-0.5 rounded-full bg-error/10 text-error text-[10px] font-mono">3 Active Nodes</span>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+<!-- Shard Card 1 -->
+<div class="danger-card-gradient p-5 rounded-lg border border-outline-variant/10 group">
+<div class="flex justify-between items-start mb-4">
+<span class="mono text-xs text-primary">shard-alpha-01</span>
+<div class="flex items-center gap-2">
+<div class="w-1.5 h-1.5 rounded-full bg-green-500"></div>
+<span class="text-[10px] uppercase text-green-500/80 font-bold">Stable</span>
+</div>
+</div>
+<div class="space-y-3">
+<button class="w-full py-2 bg-surface-container-highest hover:bg-error/20 hover:text-error text-on-surface border border-outline-variant/20 rounded text-xs font-medium transition-all">Kill Leader</button>
+<button class="w-full py-2 bg-surface-container-highest hover:bg-error/20 hover:text-error text-on-surface border border-outline-variant/20 rounded text-xs font-medium transition-all">Kill Follower</button>
+</div>
+<div class="mt-4 pt-4 border-t border-outline-variant/10 flex justify-between items-center">
+<span class="text-[10px] text-on-surface-variant">Recovery ETA</span>
+<span class="mono text-xs">--:--</span>
+</div>
+</div>
+<!-- Shard Card 2 -->
+<div class="danger-card-gradient p-5 rounded-lg border border-error/30 ring-1 ring-error/10">
+<div class="flex justify-between items-start mb-4">
+<span class="mono text-xs text-primary">shard-beta-02</span>
+<div class="flex items-center gap-2">
+<div class="w-1.5 h-1.5 rounded-full bg-tertiary"></div>
+<span class="text-[10px] uppercase text-tertiary/80 font-bold">Recovering</span>
+</div>
+</div>
+<div class="space-y-3 opacity-50 pointer-events-none">
+<button class="w-full py-2 bg-surface-container-highest border border-outline-variant/20 rounded text-xs font-medium">Kill Leader</button>
+<button class="w-full py-2 bg-surface-container-highest border border-outline-variant/20 rounded text-xs font-medium">Kill Follower</button>
+</div>
+<div class="mt-4 pt-4 border-t border-outline-variant/10 flex justify-between items-center">
+<span class="text-[10px] text-on-surface-variant">Recovery ETA</span>
+<span class="mono text-xs text-tertiary">00:42s</span>
+</div>
+</div>
+<!-- Shard Card 3 -->
+<div class="danger-card-gradient p-5 rounded-lg border border-outline-variant/10 group">
+<div class="flex justify-between items-start mb-4">
+<span class="mono text-xs text-primary">shard-gamma-03</span>
+<div class="flex items-center gap-2">
+<div class="w-1.5 h-1.5 rounded-full bg-green-500"></div>
+<span class="text-[10px] uppercase text-green-500/80 font-bold">Stable</span>
+</div>
+</div>
+<div class="space-y-3">
+<button class="w-full py-2 bg-surface-container-highest hover:bg-error/20 hover:text-error text-on-surface border border-outline-variant/20 rounded text-xs font-medium transition-all">Kill Leader</button>
+<button class="w-full py-2 bg-surface-container-highest hover:bg-error/20 hover:text-error text-on-surface border border-outline-variant/20 rounded text-xs font-medium transition-all">Kill Follower</button>
+</div>
+<div class="mt-4 pt-4 border-t border-outline-variant/10 flex justify-between items-center">
+<span class="text-[10px] text-on-surface-variant">Recovery ETA</span>
+<span class="mono text-xs">--:--</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Coordinator Failures -->
+<section>
+<h3 class="label-sm text-[11px] uppercase tracking-[0.2em] text-on-surface-variant font-bold mb-6">02. Coordinator Failures</h3>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<div class="surface-container p-6 rounded-xl flex items-center justify-between border border-outline-variant/10">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded bg-secondary/10 flex items-center justify-center">
+<span class="material-symbols-outlined text-secondary">hub</span>
+</div>
+<div>
+<p class="mono text-sm">coord-main-01</p>
+<p class="text-[10px] text-on-surface-variant uppercase tracking-tighter">High Availability Role</p>
+</div>
+</div>
+<button class="px-4 py-2 bg-error text-on-error rounded text-xs font-bold hover:opacity-90 transition-all">Kill Coordinator</button>
+</div>
+<div class="surface-container p-6 rounded-xl flex items-center justify-between border border-outline-variant/10">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded bg-secondary/10 flex items-center justify-center">
+<span class="material-symbols-outlined text-secondary">hub</span>
+</div>
+<div>
+<p class="mono text-sm">coord-main-02</p>
+<p class="text-[10px] text-on-surface-variant uppercase tracking-tighter">Standby Role</p>
+</div>
+</div>
+<button class="px-4 py-2 bg-error text-on-error rounded text-xs font-bold hover:opacity-90 transition-all">Kill Coordinator</button>
+</div>
+</div>
+</section>
+<!-- Network Partition -->
+<section>
+<h3 class="label-sm text-[11px] uppercase tracking-[0.2em] text-on-surface-variant font-bold mb-6">03. Network Partition</h3>
+<div class="surface-container rounded-2xl p-8 border border-outline-variant/5">
+<div class="relative h-48 flex items-center justify-between px-20">
+<!-- Connection Lines Background -->
+<div class="absolute inset-0 flex items-center justify-center">
+<svg class="w-full h-full opacity-20" viewbox="0 0 600 200">
+<path class="text-primary" d="M100,100 L500,100" stroke="currentColor" stroke-dasharray="8 4" stroke-width="2"></path>
+<path class="text-primary" d="M100,100 L300,40" stroke="currentColor" stroke-dasharray="4 2" stroke-width="1"></path>
+<path class="text-primary" d="M300,40 L500,100" stroke="currentColor" stroke-dasharray="4 2" stroke-width="1"></path>
+</svg>
+</div>
+<div class="z-10 flex flex-col items-center gap-2">
+<div class="w-16 h-16 rounded-full bg-surface-container-highest border-2 border-primary/40 flex items-center justify-center">
+<span class="material-symbols-outlined text-primary text-3xl">dns</span>
+</div>
+<span class="mono text-[10px]">Zone A</span>
+</div>
+<div class="z-10 flex flex-col items-center gap-6">
+<div class="px-6 py-2 bg-error/10 border border-error/30 text-error rounded-full text-[10px] font-bold tracking-widest uppercase">Partition Ready</div>
+<button class="group flex items-center gap-3 px-8 py-3 bg-error text-on-error rounded-full font-bold transition-all hover:scale-105 active:scale-95 shadow-xl shadow-error/20">
+<span class="material-symbols-outlined">link_off</span>
+                                        Disconnect Cluster
+                                    </button>
+</div>
+<div class="z-10 flex flex-col items-center gap-2">
+<div class="w-16 h-16 rounded-full bg-surface-container-highest border-2 border-primary/40 flex items-center justify-center">
+<span class="material-symbols-outlined text-primary text-3xl">dns</span>
+</div>
+<span class="mono text-[10px]">Zone B</span>
+</div>
+</div>
+</div>
+</section>
+</div>
+<!-- Right Side Observation Panel -->
+<aside class="w-full lg:w-[320px] glass-panel rounded-2xl border border-outline-variant/10 flex flex-col h-[calc(100vh-120px)] sticky top-6">
+<div class="p-5 border-b border-outline-variant/10 flex justify-between items-center">
+<h4 class="label-sm text-[10px] uppercase tracking-widest text-on-surface-variant font-bold">Observation Panel</h4>
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+<span class="text-[9px] uppercase font-bold tracking-tighter opacity-70">Live Stream</span>
+</div>
+</div>
+<div class="flex-1 overflow-y-auto p-5 space-y-4">
+<!-- Stats Grid -->
+<div class="grid grid-cols-2 gap-4 mb-6">
+<div class="bg-surface-container-lowest p-3 rounded border border-outline-variant/10">
+<p class="text-[9px] text-on-surface-variant uppercase tracking-widest mb-1">MTTR</p>
+<p class="mono text-lg text-primary">1.2s</p>
+</div>
+<div class="bg-surface-container-lowest p-3 rounded border border-outline-variant/10">
+<p class="text-[9px] text-on-surface-variant uppercase tracking-widest mb-1">Availability</p>
+<p class="mono text-lg text-green-500">99.98%</p>
+</div>
+</div>
+<div class="space-y-4">
+<h5 class="text-[10px] uppercase tracking-widest text-on-surface-variant/60 font-bold border-b border-outline-variant/5 pb-2">Fault Event Log</h5>
+<!-- Log Entry 1 -->
+<div class="space-y-1">
+<div class="flex justify-between items-center">
+<span class="mono text-[10px] text-tertiary">14:20:01.44</span>
+<span class="text-[9px] bg-tertiary/10 text-tertiary px-1 rounded uppercase font-bold">RECOVERY_STARTED</span>
+</div>
+<p class="text-[11px] text-on-surface-variant leading-relaxed">
+                                    Shard <span class="text-primary mono">shard-beta-02</span> reelection initiated after leader termination.
+                                </p>
+</div>
+<!-- Log Entry 2 -->
+<div class="space-y-1">
+<div class="flex justify-between items-center">
+<span class="mono text-[10px] text-error">14:19:58.12</span>
+<span class="text-[9px] bg-error/10 text-error px-1 rounded uppercase font-bold">FAULT_INJECTED</span>
+</div>
+<p class="text-[11px] text-on-surface-variant leading-relaxed">
+                                    Kill sequence executed for <span class="text-primary mono">shard-beta-02-L</span> by user <span class="text-primary">Admin_04</span>.
+                                </p>
+</div>
+<!-- Log Entry 3 -->
+<div class="space-y-1">
+<div class="flex justify-between items-center">
+<span class="mono text-[10px] text-on-surface-variant">14:15:30.00</span>
+<span class="text-[9px] bg-surface-container-highest text-on-surface px-1 rounded uppercase font-bold">SYSTEM_IDLE</span>
+</div>
+<p class="text-[11px] text-on-surface-variant leading-relaxed">
+                                    No active faults. All shards reporting consistent consensus state.
+                                </p>
+</div>
+<!-- Log Entry 4 -->
+<div class="space-y-1">
+<div class="flex justify-between items-center">
+<span class="mono text-[10px] text-green-500">14:12:44.29</span>
+<span class="text-[9px] bg-green-500/10 text-green-500 px-1 rounded uppercase font-bold">HEALTHY</span>
+</div>
+<p class="text-[11px] text-on-surface-variant leading-relaxed">
+                                    Protocol Invariant Check passed: <span class="text-green-500 mono">SUCCESS</span>. 0 errors detected.
+                                </p>
+</div>
+</div>
+</div>
+<div class="p-4 bg-surface-container-highest/20 mt-auto">
+<button class="w-full flex items-center justify-center gap-2 py-3 border border-outline-variant/30 rounded-lg text-[11px] uppercase tracking-widest font-bold hover:bg-surface-container-highest transition-colors">
+<span class="material-symbols-outlined text-sm">download</span>
+                            Export Resilience Report
+                        </button>
+</div>
+</aside>
+</div>
+</main>
+</div>
+</body></html>

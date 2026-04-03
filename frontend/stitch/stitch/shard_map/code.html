@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Shard Map | LedgerOS</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-error": "#690005",
+                        "inverse-on-surface": "#303032",
+                        "surface-container": "#201f21",
+                        "surface-variant": "#353437",
+                        "surface-tint": "#c0c1ff",
+                        "inverse-surface": "#e5e1e4",
+                        "surface-dim": "#131315",
+                        "surface": "#131315",
+                        "on-secondary-fixed": "#13144a",
+                        "on-secondary-container": "#b2b3f2",
+                        "primary-fixed": "#e1e0ff",
+                        "error": "#ffb4ab",
+                        "secondary-fixed-dim": "#c0c1ff",
+                        "surface-bright": "#39393b",
+                        "tertiary-fixed-dim": "#ffb783",
+                        "tertiary-container": "#d97721",
+                        "surface-container-lowest": "#0e0e10",
+                        "on-tertiary-fixed-variant": "#703700",
+                        "outline-variant": "#464554",
+                        "on-tertiary-container": "#452000",
+                        "on-tertiary": "#4f2500",
+                        "on-surface-variant": "#c7c4d7",
+                        "surface-container-highest": "#353437",
+                        "secondary-container": "#42447b",
+                        "surface-container-high": "#2a2a2c",
+                        "surface-container-low": "#1b1b1d",
+                        "secondary-fixed": "#e1e0ff",
+                        "on-secondary-fixed-variant": "#404178",
+                        "tertiary-fixed": "#ffdcc5",
+                        "background": "#131315",
+                        "on-background": "#e5e1e4",
+                        "primary-container": "#8083ff",
+                        "outline": "#908fa0",
+                        "on-tertiary-fixed": "#301400",
+                        "on-primary-container": "#0d0096",
+                        "on-secondary": "#292a60",
+                        "tertiary": "#ffb783",
+                        "error-container": "#93000a",
+                        "on-error-container": "#ffdad6",
+                        "on-primary-fixed": "#07006c",
+                        "on-primary": "#1000a9",
+                        "secondary": "#c0c1ff",
+                        "on-primary-fixed-variant": "#2f2ebe",
+                        "inverse-primary": "#494bd6",
+                        "primary": "#c0c1ff",
+                        "on-surface": "#e5e1e4",
+                        "primary-fixed-dim": "#c0c1ff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "fontFamily": {
+                        "headline": ["Inter"],
+                        "body": ["Inter"],
+                        "label": ["Inter"],
+                        "mono-data": ["JetBrains Mono"]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .tonal-shift-no-borders {
+            border: none !important;
+        }
+        .scale-98-on-click:active {
+            transform: scale(0.98);
+        }
+        .pulse-indicator {
+            position: relative;
+        }
+        .pulse-indicator::after {
+            content: '';
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background: #c0c1ff;
+            opacity: 0.4;
+            animation: pulse-ring 2s infinite;
+        }
+        @keyframes pulse-ring {
+            0% { transform: scale(0.5); opacity: 0.5; }
+            100% { transform: scale(2); opacity: 0; }
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body selection:bg-primary/30">
+<div class="flex min-h-screen">
+<!-- SideNavBar -->
+<aside class="flex flex-col h-full sticky left-0 top-0 h-screen w-[240px] bg-[#1b1b1d] dark:bg-[#1b1b1d] tonal-shift-no-borders flat-no-shadows font-sans text-sm font-medium tracking-wide">
+<div class="p-6">
+<div class="flex items-center gap-3 mb-8">
+<div class="w-8 h-8 bg-gradient-to-br from-primary to-primary-container rounded flex items-center justify-center">
+<span class="material-symbols-outlined text-on-primary-container text-lg" style="font-variation-settings: 'FILL' 1;">hexagon</span>
+</div>
+<div>
+<h1 class="text-xl font-bold tracking-tighter text-[#c0c1ff]">LedgerOS</h1>
+<p class="text-[10px] uppercase tracking-widest text-on-surface-variant/60">Cluster: Active</p>
+</div>
+</div>
+<nav class="space-y-1">
+<a class="flex items-center gap-3 px-3 py-2 text-[#a1a1aa] hover:text-[#f4f4f5] hover:bg-[#201f21] transition-colors duration-200 rounded scale-98-on-click" href="#">
+<span class="material-symbols-outlined">analytics</span>
+<span>Node Health</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-[#a1a1aa] hover:text-[#f4f4f5] hover:bg-[#201f21] transition-colors duration-200 rounded scale-98-on-click" href="#">
+<span class="material-symbols-outlined">monitoring</span>
+<span>Metrics</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-[#c0c1ff] font-bold border-r-2 border-[#6366f1] bg-[#201f21] transition-colors duration-200 scale-98-on-click" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">grid_view</span>
+<span>Clusters</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-[#a1a1aa] hover:text-[#f4f4f5] hover:bg-[#201f21] transition-colors duration-200 rounded scale-98-on-click" href="#">
+<span class="material-symbols-outlined">description</span>
+<span>System Logs</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-[#a1a1aa] hover:text-[#f4f4f5] hover:bg-[#201f21] transition-colors duration-200 rounded scale-98-on-click" href="#">
+<span class="material-symbols-outlined">settings_input_component</span>
+<span>Protocol Config</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-[#a1a1aa] hover:text-[#f4f4f5] hover:bg-[#201f21] transition-colors duration-200 rounded scale-98-on-click" href="#">
+<span class="material-symbols-outlined">account_balance</span>
+<span>Governance</span>
+</a>
+</nav>
+</div>
+<div class="mt-auto p-4 border-t border-outline-variant/10">
+<button class="w-full py-2.5 px-4 bg-gradient-to-br from-primary to-primary-container text-on-primary-container rounded-md font-bold text-xs uppercase tracking-widest scale-98-on-click shadow-lg shadow-primary/5">
+                    Run Invariant Check
+                </button>
+<div class="mt-4 flex flex-col gap-1">
+<a class="flex items-center gap-3 px-3 py-2 text-[#a1a1aa] hover:text-[#f4f4f5] transition-colors" href="#">
+<span class="material-symbols-outlined text-[12px] text-green-500" style="font-variation-settings: 'FILL' 1;">fiber_manual_record</span>
+<span>Health</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-[#a1a1aa] hover:text-[#f4f4f5] transition-colors" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span>Settings</span>
+</a>
+</div>
+</div>
+</aside>
+<!-- Main Canvas -->
+<main class="flex-1 flex flex-col bg-surface overflow-hidden">
+<!-- TopNavBar -->
+<header class="flex justify-between items-center w-full px-6 sticky top-0 z-40 bg-[#131315]/80 backdrop-blur-xl h-16 tonal-shift-no-borders">
+<div class="flex items-center gap-8">
+<span class="text-lg font-medium text-[#f4f4f5] tracking-tight">Shard Map</span>
+<nav class="hidden md:flex items-center gap-6 font-sans text-xs font-medium uppercase tracking-widest">
+<a class="text-[#a1a1aa] hover:text-[#c0c1ff] transition-all" href="#">Monitoring</a>
+<a class="text-[#c0c1ff] border-b-2 border-[#6366f1] py-5" href="#">Control</a>
+<a class="text-[#a1a1aa] hover:text-[#c0c1ff] transition-all" href="#">Insights</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-2 px-3 py-1.5 bg-surface-container rounded-full text-[10px] font-mono-data uppercase tracking-tighter text-on-surface-variant">
+<span class="w-2 h-2 rounded-full bg-green-500 pulse-indicator"></span>
+                        Last sync: 2s ago
+                    </div>
+<div class="flex items-center gap-1">
+<button class="p-2 text-[#a1a1aa] hover:text-[#c0c1ff] transition-all active:scale-95"><span class="material-symbols-outlined">refresh</span></button>
+<button class="p-2 text-[#a1a1aa] hover:text-[#c0c1ff] transition-all active:scale-95"><span class="material-symbols-outlined">notifications</span></button>
+<button class="p-2 text-[#a1a1aa] hover:text-[#c0c1ff] transition-all active:scale-95"><span class="material-symbols-outlined">account_circle</span></button>
+</div>
+</div>
+</header>
+<div class="flex-1 flex overflow-hidden">
+<!-- Partition Grid Section -->
+<section class="flex-1 p-6 overflow-y-auto scrollbar-hide">
+<div class="mb-6 flex justify-between items-end">
+<div>
+<h2 class="text-headline-sm font-medium tracking-tight text-on-background">Partition Grid</h2>
+<p class="text-sm text-on-surface-variant font-mono-data uppercase tracking-widest mt-1">Status: Balanced • 256 Active Segments</p>
+</div>
+<div class="flex gap-2">
+<div class="flex items-center gap-2 text-[10px] text-on-surface-variant uppercase tracking-widest">
+<span class="w-3 h-3 bg-primary/20 rounded-sm"></span> Low
+                                <span class="w-3 h-3 bg-primary/60 rounded-sm"></span> Med
+                                <span class="w-3 h-3 bg-primary rounded-sm"></span> High Load
+                            </div>
+</div>
+</div>
+<div class="grid grid-cols-[repeat(auto-fill,60px)] gap-[6px] pb-12">
+<!-- Generating Grid Tiles -->
+<!-- Tile Active -->
+<div class="w-[60px] h-[60px] bg-primary/90 rounded-sm flex flex-col items-center justify-center cursor-pointer hover:ring-2 ring-primary ring-offset-4 ring-offset-background transition-all group border border-primary/20">
+<span class="text-[10px] font-mono-data font-bold text-on-primary-container">#001</span>
+<span class="text-[14px] font-mono-data font-medium text-on-primary-container tracking-tighter">14k</span>
+</div>
+<!-- Repeats -->
+<div class="w-[60px] h-[60px] bg-surface-container rounded-sm flex flex-col items-center justify-center cursor-pointer hover:bg-surface-container-highest transition-all group border border-outline-variant/10">
+<span class="text-[10px] font-mono-data text-on-surface-variant group-hover:text-primary">#002</span>
+<span class="text-[14px] font-mono-data font-medium text-on-surface tracking-tighter">2.4k</span>
+</div>
+<div class="w-[60px] h-[60px] bg-surface-container rounded-sm flex flex-col items-center justify-center cursor-pointer hover:bg-surface-container-highest transition-all group border border-outline-variant/10">
+<span class="text-[10px] font-mono-data text-on-surface-variant group-hover:text-primary">#003</span>
+<span class="text-[14px] font-mono-data font-medium text-on-surface tracking-tighter">3.1k</span>
+</div>
+<div class="w-[60px] h-[60px] bg-primary/40 rounded-sm flex flex-col items-center justify-center cursor-pointer hover:bg-primary/50 transition-all group border border-primary/20">
+<span class="text-[10px] font-mono-data text-on-primary">#004</span>
+<span class="text-[14px] font-mono-data font-medium text-on-primary tracking-tighter">8.9k</span>
+</div>
+<!-- Loop logic simulation -->
+<script>
+                            const grid = document.querySelector('.grid');
+                            for (let i = 5; i <= 64; i++) {
+                                const val = Math.floor(Math.random() * 15);
+                                const opacity = val > 12 ? 'bg-primary/80' : val > 8 ? 'bg-primary/40' : 'bg-surface-container';
+                                const text = val > 12 ? 'text-on-primary-container' : 'text-on-surface';
+                                const label = val > 12 ? 'text-on-primary-container' : 'text-on-surface-variant';
+                                const count = (Math.random() * 12).toFixed(1) + 'k';
+                                
+                                grid.innerHTML += `
+                                    <div class="w-[60px] h-[60px] ${opacity} rounded-sm flex flex-col items-center justify-center cursor-pointer hover:ring-1 ring-primary/40 transition-all group border border-outline-variant/5">
+                                        <span class="text-[10px] font-mono-data ${label} group-hover:text-primary">#${i.toString().padStart(3, '0')}</span>
+                                        <span class="text-[14px] font-mono-data font-medium ${text} tracking-tighter">${count}</span>
+                                    </div>
+                                `;
+                            }
+                        </script>
+</div>
+</section>
+<!-- Right Detail Panel -->
+<aside class="w-[320px] bg-surface-container-low flex flex-col shadow-2xl z-10 border-l border-outline-variant/5">
+<div class="p-6 flex-1 overflow-y-auto scrollbar-hide">
+<div class="flex items-center justify-between mb-6">
+<h3 class="text-label-sm uppercase tracking-widest text-primary font-bold">Partition Details</h3>
+<button class="text-on-surface-variant hover:text-on-surface transition-colors">
+<span class="material-symbols-outlined text-xl">close</span>
+</button>
+</div>
+<div class="space-y-6">
+<div class="bg-surface-container p-4 rounded-lg border border-outline-variant/10">
+<div class="flex items-end justify-between">
+<span class="text-4xl font-mono-data font-medium tracking-tighter">#001</span>
+<span class="text-xs bg-green-500/10 text-green-400 px-2 py-0.5 rounded-full font-mono-data">Healthy</span>
+</div>
+<div class="mt-4 grid grid-cols-2 gap-4">
+<div>
+<p class="text-[10px] uppercase tracking-widest text-on-surface-variant mb-1">Owner Shard</p>
+<p class="font-mono-data text-sm">alpha-node-04</p>
+</div>
+<div>
+<p class="text-[10px] uppercase tracking-widest text-on-surface-variant mb-1">Accounts</p>
+<p class="font-mono-data text-sm">14,204</p>
+</div>
+</div>
+</div>
+<div>
+<p class="text-[10px] uppercase tracking-widest text-on-surface-variant mb-3">Total Balance Sum</p>
+<div class="flex items-baseline gap-2">
+<span class="text-2xl font-mono-data text-primary">1,402,944.20</span>
+<span class="text-xs text-on-surface-variant font-mono-data">LGR</span>
+</div>
+</div>
+<div class="pt-4 border-t border-outline-variant/10">
+<label class="text-[10px] uppercase tracking-widest text-on-surface-variant mb-2 block">Migrate to...</label>
+<div class="relative">
+<select class="w-full bg-surface-container-lowest border border-outline-variant/20 rounded p-2 text-xs font-mono-data focus:border-primary/40 focus:ring-0 appearance-none">
+<option>Select target shard...</option>
+<option>beta-node-01 (Capacity 42%)</option>
+<option>gamma-node-12 (Capacity 18%)</option>
+<option>delta-node-09 (Capacity 94%)</option>
+</select>
+<span class="material-symbols-outlined absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-on-surface-variant text-sm">expand_more</span>
+</div>
+<button class="w-full mt-3 py-2 bg-primary/10 border border-primary/20 text-primary text-[10px] font-bold uppercase tracking-widest rounded hover:bg-primary/20 transition-all scale-98-on-click">
+                                    Queue Migration Task
+                                </button>
+</div>
+<div class="pt-4">
+<p class="text-[10px] uppercase tracking-widest text-on-surface-variant mb-3">Sample Accounts</p>
+<div class="space-y-3">
+<div class="flex items-center justify-between p-2 hover:bg-surface-container transition-colors rounded group cursor-pointer">
+<div class="flex flex-col">
+<span class="font-mono-data text-[11px] text-on-surface">0x71C...a29B</span>
+<span class="text-[9px] text-on-surface-variant">Last activity: 12ms ago</span>
+</div>
+<span class="text-[11px] font-mono-data text-on-surface-variant group-hover:text-primary transition-colors">4.2k LGR</span>
+</div>
+<div class="flex items-center justify-between p-2 hover:bg-surface-container transition-colors rounded group cursor-pointer">
+<div class="flex flex-col">
+<span class="font-mono-data text-[11px] text-on-surface">0x14F...33E1</span>
+<span class="text-[9px] text-on-surface-variant">Last activity: 200ms ago</span>
+</div>
+<span class="text-[11px] font-mono-data text-on-surface-variant group-hover:text-primary transition-colors">12.0k LGR</span>
+</div>
+<div class="flex items-center justify-between p-2 hover:bg-surface-container transition-colors rounded group cursor-pointer">
+<div class="flex flex-col">
+<span class="font-mono-data text-[11px] text-on-surface">0xBC2...990D</span>
+<span class="text-[9px] text-on-surface-variant">Last activity: 1s ago</span>
+</div>
+<span class="text-[11px] font-mono-data text-on-surface-variant group-hover:text-primary transition-colors">0.4k LGR</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</aside>
+</div>
+<!-- Bottom Shard Summary -->
+<footer class="h-64 bg-surface-container-low border-t border-outline-variant/10 p-6">
+<div class="mb-4 flex items-center justify-between">
+<h3 class="text-label-sm uppercase tracking-widest text-on-surface-variant font-bold">Shard Topology Overview</h3>
+<div class="flex gap-4 font-mono-data text-[10px] text-on-surface-variant">
+<span>Total Shards: 4</span>
+<span>Avg Load: 64%</span>
+</div>
+</div>
+<div class="grid grid-cols-4 gap-4 h-40">
+<!-- Shard Card 1 -->
+<div class="bg-surface-container p-4 rounded-lg flex flex-col justify-between border-l-4 border-primary">
+<div>
+<div class="flex justify-between items-start mb-2">
+<span class="font-mono-data text-sm font-bold">ALPHA-04</span>
+<span class="text-[9px] bg-primary/10 text-primary px-2 py-0.5 rounded font-bold uppercase tracking-widest">Primary</span>
+</div>
+<div class="grid grid-cols-2 gap-2">
+<div>
+<p class="text-[9px] uppercase tracking-tighter text-on-surface-variant">Partitions</p>
+<p class="font-mono-data text-xs">64</p>
+</div>
+<div>
+<p class="text-[9px] uppercase tracking-tighter text-on-surface-variant">Accounts</p>
+<p class="font-mono-data text-xs">842.1k</p>
+</div>
+</div>
+</div>
+<div class="mt-4">
+<p class="text-[9px] uppercase tracking-tighter text-on-surface-variant mb-1">Balance Weight</p>
+<div class="h-1 bg-surface-container-highest rounded-full overflow-hidden">
+<div class="h-full bg-primary w-[72%]"></div>
+</div>
+</div>
+</div>
+<!-- Shard Card 2 -->
+<div class="bg-surface-container p-4 rounded-lg flex flex-col justify-between border-l-4 border-on-surface-variant/30">
+<div>
+<div class="flex justify-between items-start mb-2">
+<span class="font-mono-data text-sm font-bold">BETA-01</span>
+<span class="text-[9px] bg-surface-variant text-on-surface-variant px-2 py-0.5 rounded font-bold uppercase tracking-widest">Follower</span>
+</div>
+<div class="grid grid-cols-2 gap-2">
+<div>
+<p class="text-[9px] uppercase tracking-tighter text-on-surface-variant">Partitions</p>
+<p class="font-mono-data text-xs">128</p>
+</div>
+<div>
+<p class="text-[9px] uppercase tracking-tighter text-on-surface-variant">Accounts</p>
+<p class="font-mono-data text-xs">1.2M</p>
+</div>
+</div>
+</div>
+<div class="mt-4">
+<p class="text-[9px] uppercase tracking-tighter text-on-surface-variant mb-1">Balance Weight</p>
+<div class="h-1 bg-surface-container-highest rounded-full overflow-hidden">
+<div class="h-full bg-primary w-[44%]"></div>
+</div>
+</div>
+</div>
+<!-- Shard Card 3 -->
+<div class="bg-surface-container p-4 rounded-lg flex flex-col justify-between border-l-4 border-on-surface-variant/30">
+<div>
+<div class="flex justify-between items-start mb-2">
+<span class="font-mono-data text-sm font-bold">GAMMA-12</span>
+<span class="text-[9px] bg-surface-variant text-on-surface-variant px-2 py-0.5 rounded font-bold uppercase tracking-widest">Follower</span>
+</div>
+<div class="grid grid-cols-2 gap-2">
+<div>
+<p class="text-[9px] uppercase tracking-tighter text-on-surface-variant">Partitions</p>
+<p class="font-mono-data text-xs">32</p>
+</div>
+<div>
+<p class="text-[9px] uppercase tracking-tighter text-on-surface-variant">Accounts</p>
+<p class="font-mono-data text-xs">122.5k</p>
+</div>
+</div>
+</div>
+<div class="mt-4">
+<p class="text-[9px] uppercase tracking-tighter text-on-surface-variant mb-1">Balance Weight</p>
+<div class="h-1 bg-surface-container-highest rounded-full overflow-hidden">
+<div class="h-full bg-primary w-[12%]"></div>
+</div>
+</div>
+</div>
+<!-- Shard Card 4 -->
+<div class="bg-surface-container p-4 rounded-lg flex flex-col justify-between border-l-4 border-on-surface-variant/30">
+<div>
+<div class="flex justify-between items-start mb-2">
+<span class="font-mono-data text-sm font-bold">DELTA-09</span>
+<span class="text-[9px] bg-surface-variant text-on-surface-variant px-2 py-0.5 rounded font-bold uppercase tracking-widest">Follower</span>
+</div>
+<div class="grid grid-cols-2 gap-2">
+<div>
+<p class="text-[9px] uppercase tracking-tighter text-on-surface-variant">Partitions</p>
+<p class="font-mono-data text-xs">96</p>
+</div>
+<div>
+<p class="text-[9px] uppercase tracking-tighter text-on-surface-variant">Accounts</p>
+<p class="font-mono-data text-xs">910.8k</p>
+</div>
+</div>
+</div>
+<div class="mt-4">
+<p class="text-[9px] uppercase tracking-tighter text-on-surface-variant mb-1">Balance Weight</p>
+<div class="h-1 bg-surface-container-highest rounded-full overflow-hidden">
+<div class="h-full bg-primary w-[58%]"></div>
+</div>
+</div>
+</div>
+</div>
+</footer>
+</main>
+</div>
+</body></html>

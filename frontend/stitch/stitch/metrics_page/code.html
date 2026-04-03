@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>LedgerOS | Metrics Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-error": "#690005",
+                        "inverse-on-surface": "#303032",
+                        "surface-container": "#201f21",
+                        "surface-variant": "#353437",
+                        "surface-tint": "#c0c1ff",
+                        "inverse-surface": "#e5e1e4",
+                        "surface-dim": "#131315",
+                        "surface": "#131315",
+                        "on-secondary-fixed": "#13144a",
+                        "on-secondary-container": "#b2b3f2",
+                        "primary-fixed": "#e1e0ff",
+                        "error": "#ffb4ab",
+                        "secondary-fixed-dim": "#c0c1ff",
+                        "surface-bright": "#39393b",
+                        "tertiary-fixed-dim": "#ffb783",
+                        "tertiary-container": "#d97721",
+                        "surface-container-lowest": "#0e0e10",
+                        "on-tertiary-fixed-variant": "#703700",
+                        "outline-variant": "#464554",
+                        "on-tertiary-container": "#452000",
+                        "on-tertiary": "#4f2500",
+                        "on-surface-variant": "#c7c4d7",
+                        "surface-container-highest": "#353437",
+                        "secondary-container": "#42447b",
+                        "surface-container-high": "#2a2a2c",
+                        "surface-container-low": "#1b1b1d",
+                        "secondary-fixed": "#e1e0ff",
+                        "on-secondary-fixed-variant": "#404178",
+                        "tertiary-fixed": "#ffdcc5",
+                        "background": "#131315",
+                        "on-background": "#e5e1e4",
+                        "primary-container": "#8083ff",
+                        "outline": "#908fa0",
+                        "on-tertiary-fixed": "#301400",
+                        "on-primary-container": "#0d0096",
+                        "on-secondary": "#292a60",
+                        "tertiary": "#ffb783",
+                        "error-container": "#93000a",
+                        "on-error-container": "#ffdad6",
+                        "on-primary-fixed": "#07006c",
+                        "on-primary": "#1000a9",
+                        "secondary": "#c0c1ff",
+                        "on-primary-fixed-variant": "#2f2ebe",
+                        "inverse-primary": "#494bd6",
+                        "primary": "#c0c1ff",
+                        "on-surface": "#e5e1e4",
+                        "primary-fixed-dim": "#c0c1ff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "fontFamily": {
+                        "headline": ["Inter"],
+                        "body": ["Inter"],
+                        "label": ["Inter"],
+                        "mono": ["JetBrains Mono"]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body {
+            background-color: #131315;
+            color: #e5e1e4;
+        }
+    </style>
+</head>
+<body class="flex min-h-screen">
+<!-- SideNavBar Shell -->
+<aside class="flex flex-col h-full sticky left-0 top-0 h-screen w-[240px] bg-[#1b1b1d] border-r border-[#464554]/15 z-50">
+<div class="p-6 flex flex-col gap-1">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-lg bg-gradient-to-br from-[#c0c1ff] to-[#8083ff] flex items-center justify-center">
+<span class="material-symbols-outlined text-[#0d0096] text-xl" data-icon="hexagon">hexagon</span>
+</div>
+<span class="text-xl font-bold tracking-tighter text-[#c0c1ff]">LedgerOS</span>
+</div>
+<span class="text-[10px] font-mono text-[#a1a1aa] uppercase tracking-[0.2em] mt-2">Cluster: Active</span>
+</div>
+<nav class="flex-1 px-3 space-y-1 mt-4">
+<a class="flex items-center gap-3 px-4 py-3 rounded-md transition-colors duration-200 text-[#a1a1aa] hover:bg-[#201f21] hover:text-[#f4f4f5]" href="#">
+<span class="material-symbols-outlined" data-icon="analytics">analytics</span>
+<span class="font-sans text-sm font-medium tracking-wide">Node Health</span>
+</a>
+<!-- Active Tab: Metrics -->
+<a class="flex items-center gap-3 px-4 py-3 rounded-md text-[#c0c1ff] font-bold border-r-2 border-[#6366f1] bg-[#201f21]" href="#">
+<span class="material-symbols-outlined" data-icon="monitoring">monitoring</span>
+<span class="font-sans text-sm font-medium tracking-wide">Metrics</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-md transition-colors duration-200 text-[#a1a1aa] hover:bg-[#201f21] hover:text-[#f4f4f5]" href="#">
+<span class="material-symbols-outlined" data-icon="grid_view">grid_view</span>
+<span class="font-sans text-sm font-medium tracking-wide">Clusters</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-md transition-colors duration-200 text-[#a1a1aa] hover:bg-[#201f21] hover:text-[#f4f4f5]" href="#">
+<span class="material-symbols-outlined" data-icon="description">description</span>
+<span class="font-sans text-sm font-medium tracking-wide">System Logs</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-md transition-colors duration-200 text-[#a1a1aa] hover:bg-[#201f21] hover:text-[#f4f4f5]" href="#">
+<span class="material-symbols-outlined" data-icon="settings_input_component">settings_input_component</span>
+<span class="font-sans text-sm font-medium tracking-wide">Protocol Config</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-md transition-colors duration-200 text-[#a1a1aa] hover:bg-[#201f21] hover:text-[#f4f4f5]" href="#">
+<span class="material-symbols-outlined" data-icon="account_balance">account_balance</span>
+<span class="font-sans text-sm font-medium tracking-wide">Governance</span>
+</a>
+</nav>
+<div class="px-6 py-6 border-t border-[#464554]/10">
+<button class="w-full py-2.5 bg-gradient-to-br from-[#c0c1ff] to-[#8083ff] text-[#0d0096] text-xs font-bold rounded shadow-lg hover:opacity-90 active:scale-95 transition-all">
+                Run Invariant Check
+            </button>
+</div>
+<div class="p-4 bg-[#131315]/50">
+<div class="flex items-center justify-around">
+<button class="flex flex-col items-center gap-1 text-[#a1a1aa] hover:text-[#f4f4f5]">
+<span class="material-symbols-outlined text-green-400" data-icon="fiber_manual_record" style="font-variation-settings: 'FILL' 1;">fiber_manual_record</span>
+<span class="text-[10px] uppercase font-bold">Health</span>
+</button>
+<button class="flex flex-col items-center gap-1 text-[#a1a1aa] hover:text-[#f4f4f5]">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="text-[10px] uppercase font-bold">Settings</span>
+</button>
+</div>
+</div>
+</aside>
+<!-- Main Content Canvas -->
+<main class="flex-1 flex flex-col relative min-h-screen bg-[#131315]">
+<!-- TopNavBar Shell -->
+<header class="flex justify-between items-center w-full px-8 h-16 sticky top-0 z-40 bg-[#131315]/80 backdrop-blur-xl border-b border-[#464554]/10">
+<div class="flex items-center gap-10">
+<div class="flex gap-8">
+<a class="font-sans text-xs font-medium uppercase tracking-widest text-[#a1a1aa] hover:text-[#c0c1ff] transition-all" href="#">Monitoring</a>
+<a class="font-sans text-xs font-medium uppercase tracking-widest text-[#c0c1ff] border-b-2 border-[#6366f1] pb-4 -mb-4" href="#">Control</a>
+<a class="font-sans text-xs font-medium uppercase tracking-widest text-[#a1a1aa] hover:text-[#c0c1ff] transition-all" href="#">Insights</a>
+</div>
+</div>
+<div class="flex items-center gap-6">
+<div class="flex items-center gap-4 text-[#a1a1aa]">
+<button class="hover:text-[#c0c1ff] active:scale-95 transition-all flex items-center gap-1">
+<span class="material-symbols-outlined text-lg" data-icon="refresh">refresh</span>
+<span class="text-[10px] font-mono">2s Refresh</span>
+</button>
+<button class="hover:text-[#c0c1ff] active:scale-95 transition-all">
+<span class="material-symbols-outlined text-xl" data-icon="notifications">notifications</span>
+</button>
+<button class="hover:text-[#c0c1ff] active:scale-95 transition-all">
+<span class="material-symbols-outlined text-2xl" data-icon="account_circle">account_circle</span>
+</button>
+</div>
+</div>
+</header>
+<!-- Dashboard Content -->
+<div class="p-8 max-w-7xl mx-auto w-full space-y-8">
+<!-- Page Title -->
+<div class="flex flex-col gap-1">
+<h1 class="text-2xl font-medium tracking-tight text-[#f4f4f5]">Diagnostic Dashboards</h1>
+<p class="text-sm text-[#a1a1aa]">Deep-level system observability and real-time protocol telemetry.</p>
+</div>
+<!-- Native Stat Panels (Asymmetric Layout) -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+<div class="md:col-span-2 bg-[#1b1b1d] p-6 rounded-lg relative overflow-hidden group">
+<div class="relative z-10">
+<div class="flex justify-between items-start mb-4">
+<span class="text-[11px] font-mono uppercase tracking-[0.2em] text-[#a1a1aa]">Current Network Throughput</span>
+<span class="material-symbols-outlined text-[#c0c1ff]" data-icon="bolt">bolt</span>
+</div>
+<div class="flex items-baseline gap-4">
+<span class="text-5xl font-mono font-medium text-[#c0c1ff]">14,282</span>
+<span class="text-[#c0c1ff]/60 font-mono text-sm uppercase">TPS</span>
+</div>
+<div class="mt-6 flex items-center gap-2">
+<div class="h-1 flex-1 bg-[#464554]/30 rounded-full overflow-hidden">
+<div class="h-full w-[84%] bg-[#c0c1ff]"></div>
+</div>
+<span class="text-[10px] font-mono text-[#c0c1ff]">+12.4% vs median</span>
+</div>
+</div>
+<!-- Subtle background graphic -->
+<div class="absolute right-0 bottom-0 opacity-10 group-hover:opacity-20 transition-opacity">
+<span class="material-symbols-outlined text-[160px] translate-y-12 translate-x-4" data-icon="trending_up">trending_up</span>
+</div>
+</div>
+<div class="bg-[#1b1b1d] p-6 rounded-lg border-l-4 border-error/50">
+<div class="flex justify-between items-start mb-4">
+<span class="text-[11px] font-mono uppercase tracking-[0.2em] text-[#a1a1aa]">Protocol Error Rate</span>
+<span class="material-symbols-outlined text-error" data-icon="warning">warning</span>
+</div>
+<div class="flex items-baseline gap-4">
+<span class="text-5xl font-mono font-medium text-error">0.024</span>
+<span class="text-error/60 font-mono text-sm uppercase">%</span>
+</div>
+<div class="mt-6 text-[10px] font-mono text-on-surface-variant flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]"></span>
+                        Within Operational Bounds
+                    </div>
+</div>
+</div>
+<!-- Tabbed Interface -->
+<div class="bg-[#1b1b1d] rounded-lg overflow-hidden flex flex-col min-h-[600px]">
+<div class="flex items-center justify-between border-b border-[#464554]/15 px-6 pt-2">
+<div class="flex gap-8">
+<button class="pb-4 pt-2 border-b-2 border-[#6366f1] text-[#c0c1ff] text-sm font-medium transition-all">
+                            Grafana Dashboard
+                        </button>
+<button class="pb-4 pt-2 border-b-2 border-transparent text-[#a1a1aa] hover:text-[#f4f4f5] text-sm font-medium transition-all">
+                            Prometheus Targets
+                        </button>
+<button class="pb-4 pt-2 border-b-2 border-transparent text-[#a1a1aa] hover:text-[#f4f4f5] text-sm font-medium transition-all">
+                            Raw Metrics
+                        </button>
+</div>
+<div class="flex gap-3 pb-2">
+<a class="flex items-center gap-2 px-3 py-1.5 rounded-md text-[11px] font-bold bg-[#353437] text-on-surface hover:bg-[#464554] transition-all" href="http://localhost:3001/d/ledger-overview" target="_blank">
+<span class="material-symbols-outlined text-sm" data-icon="open_in_new">open_in_new</span>
+                            Open in Grafana
+                        </a>
+<a class="flex items-center gap-2 px-3 py-1.5 rounded-md text-[11px] font-bold bg-[#353437] text-on-surface hover:bg-[#464554] transition-all" href="http://localhost:9090/targets" target="_blank">
+<span class="material-symbols-outlined text-sm" data-icon="link">link</span>
+                            Open in Prometheus
+                        </a>
+</div>
+</div>
+<!-- Tab Content Area -->
+<div class="flex-1 p-6 relative">
+<!-- Dashboard Placeholder Frame -->
+<div class="w-full h-full min-h-[500px] rounded bg-[#131315] border border-[#464554]/10 overflow-hidden relative group">
+<!-- Simulated Iframe Content -->
+<div class="absolute inset-0 flex flex-col p-8 opacity-40 group-hover:opacity-60 transition-opacity">
+<div class="grid grid-cols-4 gap-4 mb-8">
+<div class="h-32 bg-[#1b1b1d] rounded-md animate-pulse"></div>
+<div class="h-32 bg-[#1b1b1d] rounded-md animate-pulse delay-75"></div>
+<div class="h-32 bg-[#1b1b1d] rounded-md animate-pulse delay-150"></div>
+<div class="h-32 bg-[#1b1b1d] rounded-md animate-pulse delay-200"></div>
+</div>
+<div class="flex-1 bg-[#1b1b1d] rounded-md animate-pulse relative overflow-hidden">
+<div class="absolute inset-0 flex items-center justify-center p-20">
+<div class="w-full h-1 bg-[#464554]/20 relative">
+<div class="absolute top-0 left-0 w-[40%] h-full bg-[#c0c1ff]"></div>
+<div class="absolute top-0 left-[45%] w-[10%] h-full bg-[#c0c1ff]"></div>
+<div class="absolute top-0 left-[60%] w-[25%] h-full bg-[#c0c1ff]"></div>
+</div>
+</div>
+</div>
+</div>
+<!-- Overlay Mask for Localhost simulation -->
+<div class="absolute inset-0 backdrop-blur-[2px] flex items-center justify-center">
+<div class="bg-[#201f21]/90 p-8 rounded-xl border border-[#464554]/20 max-w-md text-center">
+<div class="mb-4 inline-flex items-center justify-center w-12 h-12 rounded-full bg-[#c0c1ff]/10 text-[#c0c1ff]">
+<span class="material-symbols-outlined text-2xl" data-icon="dns">dns</span>
+</div>
+<h3 class="text-lg font-medium text-[#f4f4f5] mb-2">Connecting to Local Instance</h3>
+<p class="text-sm text-[#a1a1aa] mb-6">Attempting to establish a secure tunnel to <code>http://localhost:3001</code>. Please ensure the Grafana daemon is running.</p>
+<button class="px-6 py-2 bg-[#c0c1ff] text-[#0d0096] text-xs font-bold rounded hover:opacity-90 active:scale-95 transition-all">
+                                    Retry Connection
+                                </button>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Technical Detail Grid (Bento) -->
+<div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+<div class="md:col-span-1 bg-[#1b1b1d] p-5 rounded-lg flex flex-col justify-between h-40">
+<span class="text-[10px] font-mono text-[#a1a1aa] uppercase tracking-widest">Active Peers</span>
+<div class="text-3xl font-mono text-[#f4f4f5]">842</div>
+<div class="text-[10px] text-green-400 font-medium">+14 New (Last Hour)</div>
+</div>
+<div class="md:col-span-1 bg-[#1b1b1d] p-5 rounded-lg flex flex-col justify-between h-40">
+<span class="text-[10px] font-mono text-[#a1a1aa] uppercase tracking-widest">Storage I/O</span>
+<div class="text-3xl font-mono text-[#f4f4f5]">1.4 GB/s</div>
+<div class="text-[10px] text-[#a1a1aa] font-medium">92% Capacity utilized</div>
+</div>
+<div class="md:col-span-2 bg-[#1b1b1d] p-5 rounded-lg h-40 relative">
+<span class="text-[10px] font-mono text-[#a1a1aa] uppercase tracking-widest mb-2 block">System Pulse</span>
+<div class="flex items-center gap-1 mt-4">
+<div class="w-1 h-8 bg-[#c0c1ff]/80 rounded-full"></div>
+<div class="w-1 h-12 bg-[#c0c1ff] rounded-full"></div>
+<div class="w-1 h-6 bg-[#c0c1ff]/60 rounded-full"></div>
+<div class="w-1 h-10 bg-[#c0c1ff] rounded-full"></div>
+<div class="w-1 h-16 bg-[#c0c1ff] rounded-full"></div>
+<div class="w-1 h-8 bg-[#c0c1ff]/80 rounded-full"></div>
+<div class="w-1 h-12 bg-[#c0c1ff] rounded-full"></div>
+<div class="w-1 h-14 bg-[#c0c1ff] rounded-full"></div>
+<div class="w-1 h-6 bg-[#c0c1ff]/40 rounded-full"></div>
+<div class="w-1 h-8 bg-[#c0c1ff]/80 rounded-full"></div>
+<div class="w-1 h-4 bg-[#c0c1ff]/20 rounded-full"></div>
+<div class="w-1 h-10 bg-[#c0c1ff] rounded-full"></div>
+<div class="w-1 h-12 bg-[#c0c1ff] rounded-full"></div>
+</div>
+<div class="absolute right-6 bottom-6 flex items-center gap-2">
+<div class="relative flex h-3 w-3">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#c0c1ff] opacity-75"></span>
+<span class="relative inline-flex rounded-full h-3 w-3 bg-[#c0c1ff]"></span>
+</div>
+<span class="text-[10px] font-mono text-[#c0c1ff] uppercase">Syncing</span>
+</div>
+</div>
+</div>
+<!-- Raw Metrics Visualization Section -->
+<div class="bg-[#131315] border border-[#464554]/15 rounded-lg p-6">
+<div class="flex items-center justify-between mb-6">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-[#a1a1aa]" data-icon="terminal">terminal</span>
+<h3 class="text-sm font-medium text-[#f4f4f5]">Raw Prometheus Format</h3>
+</div>
+<button class="text-[11px] font-mono text-[#c0c1ff] hover:underline uppercase tracking-widest">
+                        Copy to Clipboard
+                    </button>
+</div>
+<div class="bg-black/40 p-4 rounded-md font-mono text-xs leading-relaxed text-[#c7c4d7]/70 border border-[#464554]/5 overflow-x-auto">
+<pre><code># HELP ledger_tps_count Current transactions per second
+# TYPE ledger_tps_count gauge
+ledger_tps_count{node_id="n1-global-prod", region="us-east-1"} 14282.44
+ledger_tps_count{node_id="n2-global-prod", region="eu-west-1"} 12105.12
+
+# HELP protocol_error_count Total count of internal state errors
+# TYPE protocol_error_count counter
+protocol_error_count{error_type="invariant_mismatch"} 0
+protocol_error_count{error_type="consensus_lag"} 12
+protocol_error_count{error_type="db_deadlock"} 1
+
+# HELP mempool_size_bytes Total size of unconfirmed tx pool
+# TYPE mempool_size_bytes gauge
+mempool_size_bytes 428194412</code></pre>
+</div>
+</div>
+</div>
+<!-- Sticky Status Footer -->
+<footer class="mt-auto border-t border-[#464554]/10 bg-[#1b1b1d]/50 px-8 py-3 flex items-center justify-between">
+<div class="flex items-center gap-6 text-[10px] font-mono text-[#a1a1aa]">
+<div class="flex items-center gap-2">
+<span class="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                    API: v2.4.1-stable
+                </div>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[14px]" data-icon="schedule">schedule</span>
+                    Last scrape: 240ms ago
+                </div>
+</div>
+<div class="flex items-center gap-4">
+<span class="text-[10px] font-mono text-[#c0c1ff]">SESSION: 7x2f-91-m0</span>
+</div>
+</footer>
+</main>
+</body></html>

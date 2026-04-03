@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>LedgerOS | Transactions Explorer</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-error": "#690005",
+                        "inverse-on-surface": "#303032",
+                        "surface-container": "#201f21",
+                        "surface-variant": "#353437",
+                        "surface-tint": "#c0c1ff",
+                        "inverse-surface": "#e5e1e4",
+                        "surface-dim": "#131315",
+                        "surface": "#131315",
+                        "on-secondary-fixed": "#13144a",
+                        "on-secondary-container": "#b2b3f2",
+                        "primary-fixed": "#e1e0ff",
+                        "error": "#ffb4ab",
+                        "secondary-fixed-dim": "#c0c1ff",
+                        "surface-bright": "#39393b",
+                        "tertiary-fixed-dim": "#ffb783",
+                        "tertiary-container": "#d97721",
+                        "surface-container-lowest": "#0e0e10",
+                        "on-tertiary-fixed-variant": "#703700",
+                        "outline-variant": "#464554",
+                        "on-tertiary-container": "#452000",
+                        "on-tertiary": "#4f2500",
+                        "on-surface-variant": "#c7c4d7",
+                        "surface-container-highest": "#353437",
+                        "secondary-container": "#42447b",
+                        "surface-container-high": "#2a2a2c",
+                        "surface-container-low": "#1b1b1d",
+                        "secondary-fixed": "#e1e0ff",
+                        "on-secondary-fixed-variant": "#404178",
+                        "tertiary-fixed": "#ffdcc5",
+                        "background": "#131315",
+                        "on-background": "#e5e1e4",
+                        "primary-container": "#8083ff",
+                        "outline": "#908fa0",
+                        "on-tertiary-fixed": "#301400",
+                        "on-primary-container": "#0d0096",
+                        "on-secondary": "#292a60",
+                        "tertiary": "#ffb783",
+                        "error-container": "#93000a",
+                        "on-error-container": "#ffdad6",
+                        "on-primary-fixed": "#07006c",
+                        "on-primary": "#1000a9",
+                        "secondary": "#c0c1ff",
+                        "on-primary-fixed-variant": "#2f2ebe",
+                        "inverse-primary": "#494bd6",
+                        "primary": "#c0c1ff",
+                        "on-surface": "#e5e1e4",
+                        "primary-fixed-dim": "#c0c1ff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "fontFamily": {
+                        "headline": ["Inter"],
+                        "body": ["Inter"],
+                        "label": ["Inter"],
+                        "mono-data": ["JetBrains Mono"]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        body {
+            background-color: #131315;
+            color: #e5e1e4;
+            font-family: 'Inter', sans-serif;
+        }
+        .mono-text {
+            font-family: 'JetBrains Mono', monospace;
+        }
+    </style>
+</head>
+<body class="flex min-h-screen">
+<!-- SideNavBar Component -->
+<aside class="flex flex-col h-full sticky left-0 top-0 h-screen w-[240px] border-r border-[#464554]/15 bg-[#1b1b1d] dark:bg-[#1b1b1d] tonal-shift-no-borders flat-no-shadows">
+<div class="p-6">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-lg bg-gradient-to-br from-[#c0c1ff] to-[#8083ff] flex items-center justify-center">
+<span class="material-symbols-outlined text-on-primary-container" style="font-variation-settings: 'FILL' 1;">hexagon</span>
+</div>
+<div>
+<h1 class="text-xl font-bold tracking-tighter text-[#c0c1ff]">LedgerOS</h1>
+<p class="text-[10px] uppercase tracking-widest text-on-surface-variant/60">Cluster: Active</p>
+</div>
+</div>
+</div>
+<nav class="flex-1 px-3 space-y-1">
+<a class="flex items-center px-3 py-2 text-sm font-medium transition-colors duration-200 rounded-lg text-[#a1a1aa] hover:text-[#f4f4f5] hover:bg-[#201f21]" href="#">
+<span class="material-symbols-outlined mr-3" data-icon="analytics">analytics</span> Node Health
+            </a>
+<a class="flex items-center px-3 py-2 text-sm font-medium transition-colors duration-200 rounded-lg text-[#a1a1aa] hover:text-[#f4f4f5] hover:bg-[#201f21]" href="#">
+<span class="material-symbols-outlined mr-3" data-icon="monitoring">monitoring</span> Metrics
+            </a>
+<a class="flex items-center px-3 py-2 text-sm font-medium transition-colors duration-200 rounded-lg text-[#c0c1ff] font-bold border-r-2 border-[#6366f1] bg-[#201f21]" href="#">
+<span class="material-symbols-outlined mr-3" data-icon="grid_view" style="font-variation-settings: 'FILL' 1;">grid_view</span> Clusters
+            </a>
+<a class="flex items-center px-3 py-2 text-sm font-medium transition-colors duration-200 rounded-lg text-[#a1a1aa] hover:text-[#f4f4f5] hover:bg-[#201f21]" href="#">
+<span class="material-symbols-outlined mr-3" data-icon="description">description</span> System Logs
+            </a>
+<a class="flex items-center px-3 py-2 text-sm font-medium transition-colors duration-200 rounded-lg text-[#a1a1aa] hover:text-[#f4f4f5] hover:bg-[#201f21]" href="#">
+<span class="material-symbols-outlined mr-3" data-icon="settings_input_component">settings_input_component</span> Protocol Config
+            </a>
+<a class="flex items-center px-3 py-2 text-sm font-medium transition-colors duration-200 rounded-lg text-[#a1a1aa] hover:text-[#f4f4f5] hover:bg-[#201f21]" href="#">
+<span class="material-symbols-outlined mr-3" data-icon="account_balance">account_balance</span> Governance
+            </a>
+</nav>
+<div class="p-4 mt-auto space-y-4">
+<button class="w-full py-2 px-4 rounded-md bg-gradient-to-r from-primary to-primary-container text-on-primary-container text-xs font-bold uppercase tracking-widest scale-98-on-click active:opacity-80 transition-all">
+                Run Invariant Check
+            </button>
+<div class="pt-4 border-t border-[#464554]/15 space-y-1">
+<a class="flex items-center px-3 py-2 text-xs font-medium text-[#a1a1aa] hover:text-[#f4f4f5]" href="#">
+<span class="material-symbols-outlined mr-3 text-emerald-500" data-icon="fiber_manual_record" style="font-variation-settings: 'FILL' 1;">fiber_manual_record</span> Health
+                </a>
+<a class="flex items-center px-3 py-2 text-xs font-medium text-[#a1a1aa] hover:text-[#f4f4f5]" href="#">
+<span class="material-symbols-outlined mr-3" data-icon="settings">settings</span> Settings
+                </a>
+</div>
+</div>
+</aside>
+<main class="flex-1 flex flex-col min-w-0 bg-[#131315]">
+<!-- TopNavBar Component -->
+<header class="flex justify-between items-center w-full px-8 sticky top-0 z-40 bg-[#131315]/80 backdrop-blur-xl docked full-width top-0 h-16 tonal-shift-no-borders flat-no-shadows">
+<div class="flex items-center gap-8">
+<span class="text-lg font-medium text-[#f4f4f5] tracking-widest uppercase">Monitoring</span>
+<nav class="hidden md:flex items-center gap-6">
+<a class="text-xs font-medium uppercase tracking-widest text-[#a1a1aa] hover:text-[#c0c1ff] transition-all" href="#">Control</a>
+<a class="text-xs font-medium uppercase tracking-widest text-[#c0c1ff] border-b-2 border-[#6366f1] pb-5 translate-y-1" href="#">Insights</a>
+<a class="text-xs font-medium uppercase tracking-widest text-[#a1a1aa] hover:text-[#c0c1ff] transition-all" href="#">Explorer</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-2 px-3 py-1.5 rounded-md bg-surface-container-low border border-outline-variant/10">
+<span class="material-symbols-outlined text-xs text-on-surface-variant" data-icon="refresh">refresh</span>
+<span class="text-[10px] font-mono-data text-on-surface-variant uppercase tracking-tighter">2s Refresh</span>
+</div>
+<div class="flex items-center gap-3 border-l border-outline-variant/20 pl-4">
+<button class="p-1 text-[#a1a1aa] hover:text-[#f4f4f5] transition-colors">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<div class="w-8 h-8 rounded-full overflow-hidden border border-primary/20">
+<img class="w-full h-full object-cover" data-alt="close-up portrait of a professional system administrator in a dimly lit server room environment" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBKiLhpcsrvMVzKrUD7oLalUEjpgsPiQBIV7NJ9ezF36-FP5l3eO9fYoPLmQIzZckHZ_m-Dd-EWZr3Db3j_nFxzY4EC3LFXrA_G_uL3sNohAlGbsZOswVOvDaGhxBa-s-PcFft3nvm7uEQif9bYY6n0qXwqOPCbU-2PUZgX_Q2Bd8iGF4ppt19uSXLoNDeVZTQXT5oAFHMgt9MV6p_g0i8kRvQVKdp9GbcrRvs1AWiBBLQIjG5ssHizm7jgOSLcPA35ZN53qz8ziQ"/>
+</div>
+</div>
+</div>
+</header>
+<!-- Content Area -->
+<div class="p-8 max-w-[1600px] mx-auto w-full">
+<!-- Header Section -->
+<div class="mb-8 flex justify-between items-end">
+<div>
+<h2 class="text-3xl font-medium tracking-tight text-on-surface mb-2">Transactions Explorer</h2>
+<p class="text-on-surface-variant text-sm max-w-xl">Real-time observational log of all cross-shard and single-shard atomic commitments within the LedgerOS fabric.</p>
+</div>
+<div class="flex gap-3">
+<button class="flex items-center gap-2 px-4 py-2 rounded-md bg-surface-container text-on-surface text-sm font-medium border border-outline-variant/10 hover:bg-surface-variant transition-colors">
+<span class="material-symbols-outlined text-sm" data-icon="download">download</span>
+                        Export CSV
+                    </button>
+</div>
+</div>
+<!-- Filter Bar -->
+<div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6 p-4 rounded-xl bg-surface-container-low border border-outline-variant/5">
+<div class="md:col-span-2 relative">
+<span class="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-on-surface-variant text-lg">search</span>
+<input class="w-full pl-10 pr-4 py-2.5 bg-surface-container-lowest border-none rounded-lg text-sm text-on-surface focus:ring-1 focus:ring-primary/40 placeholder:text-on-surface-variant/40" placeholder="Search by Transaction ID, Source, or Shard..." type="text"/>
+</div>
+<div class="relative">
+<label class="absolute -top-2 left-3 px-1 bg-surface-container-low text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Status</label>
+<select class="w-full bg-surface-container-lowest border-none rounded-lg py-2.5 px-3 text-sm text-on-surface focus:ring-1 focus:ring-primary/40 appearance-none">
+<option>All Statuses</option>
+<option>Committed</option>
+<option>Aborted</option>
+<option>Prepared</option>
+</select>
+</div>
+<div class="relative">
+<label class="absolute -top-2 left-3 px-1 bg-surface-container-low text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Type</label>
+<select class="w-full bg-surface-container-lowest border-none rounded-lg py-2.5 px-3 text-sm text-on-surface focus:ring-1 focus:ring-primary/40 appearance-none">
+<option>All Types</option>
+<option>Single-Shard</option>
+<option>Cross-Shard</option>
+</select>
+</div>
+<div class="relative">
+<label class="absolute -top-2 left-3 px-1 bg-surface-container-low text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Shard Range</label>
+<select class="w-full bg-surface-container-lowest border-none rounded-lg py-2.5 px-3 text-sm text-on-surface focus:ring-1 focus:ring-primary/40 appearance-none">
+<option>All Shards</option>
+<option>Shard 01</option>
+<option>Shard 02</option>
+<option>Shard 03</option>
+</select>
+</div>
+</div>
+<div class="flex gap-8 items-start">
+<!-- Main Table Section -->
+<div class="flex-1 min-w-0">
+<div class="overflow-x-auto rounded-xl bg-surface-container-low shadow-2xl">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-surface-container border-b border-outline-variant/10">
+<th class="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Transaction ID</th>
+<th class="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Timestamp</th>
+<th class="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Source / Dest</th>
+<th class="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant text-right">Amount</th>
+<th class="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Type</th>
+<th class="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Status</th>
+<th class="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant text-right">Latency</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant/5">
+<!-- Row 1 -->
+<tr class="hover:bg-surface-container transition-colors group">
+<td class="px-6 py-4">
+<div class="flex items-center gap-2">
+<span class="mono-text text-sm text-primary group-hover:underline cursor-pointer">0x7f2...a9e1</span>
+<span class="material-symbols-outlined text-xs text-on-surface-variant/40" data-icon="open_in_new">open_in_new</span>
+</div>
+</td>
+<td class="px-6 py-4">
+<div class="text-xs text-on-surface">Oct 24, 14:02:11</div>
+<div class="text-[10px] text-on-surface-variant">32ms ago</div>
+</td>
+<td class="px-6 py-4">
+<div class="flex items-center gap-2">
+<span class="px-1.5 py-0.5 rounded bg-surface-container-highest text-[10px] mono-text text-on-surface-variant">SH01</span>
+<span class="material-symbols-outlined text-xs text-on-surface-variant/40" data-icon="arrow_right_alt">arrow_right_alt</span>
+<span class="px-1.5 py-0.5 rounded bg-surface-container-highest text-[10px] mono-text text-on-surface-variant">SH03</span>
+</div>
+</td>
+<td class="px-6 py-4 text-right mono-text text-sm font-medium">1,240.00 <span class="text-[10px] text-on-surface-variant">LGR</span></td>
+<td class="px-6 py-4">
+<span class="text-[10px] font-bold uppercase tracking-tighter px-2 py-0.5 rounded bg-blue-500/10 text-blue-400">Cross-Shard</span>
+</td>
+<td class="px-6 py-4">
+<div class="flex items-center gap-2">
+<div class="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div>
+<span class="text-[10px] font-bold uppercase tracking-widest text-emerald-500">Committed</span>
+</div>
+</td>
+<td class="px-6 py-4 text-right mono-text text-xs text-on-surface-variant">142ms</td>
+</tr>
+<!-- Row 2 -->
+<tr class="hover:bg-surface-container transition-colors group">
+<td class="px-6 py-4">
+<div class="flex items-center gap-2">
+<span class="mono-text text-sm text-primary group-hover:underline cursor-pointer">0x9a4...f012</span>
+<span class="material-symbols-outlined text-xs text-on-surface-variant/40" data-icon="open_in_new">open_in_new</span>
+</div>
+</td>
+<td class="px-6 py-4">
+<div class="text-xs text-on-surface">Oct 24, 14:02:08</div>
+<div class="text-[10px] text-on-surface-variant">3s ago</div>
+</td>
+<td class="px-6 py-4">
+<div class="flex items-center gap-2">
+<span class="px-1.5 py-0.5 rounded bg-surface-container-highest text-[10px] mono-text text-on-surface-variant">SH02</span>
+<span class="material-symbols-outlined text-xs text-on-surface-variant/40" data-icon="arrow_right_alt">arrow_right_alt</span>
+<span class="px-1.5 py-0.5 rounded bg-surface-container-highest text-[10px] mono-text text-on-surface-variant">SH02</span>
+</div>
+</td>
+<td class="px-6 py-4 text-right mono-text text-sm font-medium">45.50 <span class="text-[10px] text-on-surface-variant">LGR</span></td>
+<td class="px-6 py-4">
+<span class="text-[10px] font-bold uppercase tracking-tighter px-2 py-0.5 rounded bg-purple-500/10 text-purple-400">Single-Shard</span>
+</td>
+<td class="px-6 py-4">
+<div class="flex items-center gap-2">
+<div class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse shadow-[0_0_8px_rgba(245,158,11,0.5)]"></div>
+<span class="text-[10px] font-bold uppercase tracking-widest text-amber-500">Prepared</span>
+</div>
+</td>
+<td class="px-6 py-4 text-right mono-text text-xs text-on-surface-variant">88ms</td>
+</tr>
+<!-- Row 3 (Error) -->
+<tr class="hover:bg-surface-container transition-colors group">
+<td class="px-6 py-4">
+<div class="flex items-center gap-2">
+<span class="mono-text text-sm text-primary group-hover:underline cursor-pointer">0x1b2...c334</span>
+<span class="material-symbols-outlined text-xs text-on-surface-variant/40" data-icon="open_in_new">open_in_new</span>
+</div>
+</td>
+<td class="px-6 py-4">
+<div class="text-xs text-on-surface">Oct 24, 14:01:55</div>
+<div class="text-[10px] text-on-surface-variant">16s ago</div>
+</td>
+<td class="px-6 py-4">
+<div class="flex items-center gap-2">
+<span class="px-1.5 py-0.5 rounded bg-surface-container-highest text-[10px] mono-text text-on-surface-variant">SH03</span>
+<span class="material-symbols-outlined text-xs text-on-surface-variant/40" data-icon="arrow_right_alt">arrow_right_alt</span>
+<span class="px-1.5 py-0.5 rounded bg-surface-container-highest text-[10px] mono-text text-on-surface-variant">SH01</span>
+</div>
+</td>
+<td class="px-6 py-4 text-right mono-text text-sm font-medium">8,100.22 <span class="text-[10px] text-on-surface-variant">LGR</span></td>
+<td class="px-6 py-4">
+<span class="text-[10px] font-bold uppercase tracking-tighter px-2 py-0.5 rounded bg-blue-500/10 text-blue-400">Cross-Shard</span>
+</td>
+<td class="px-6 py-4">
+<div class="flex items-center gap-2">
+<div class="w-1.5 h-1.5 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]"></div>
+<span class="text-[10px] font-bold uppercase tracking-widest text-red-500">Aborted</span>
+</div>
+</td>
+<td class="px-6 py-4 text-right mono-text text-xs text-on-surface-variant">1,240ms</td>
+</tr>
+<!-- Generating dummy rows for visual weight -->
+<tr class="hover:bg-surface-container transition-colors group opacity-80 border-t border-outline-variant/5">
+<td class="px-6 py-3"><span class="mono-text text-xs text-on-surface-variant">0x3e1...da91</span></td>
+<td class="px-6 py-3 text-xs text-on-surface-variant">14:01:42</td>
+<td class="px-6 py-3 text-xs text-on-surface-variant">SH01 → SH02</td>
+<td class="px-6 py-3 text-right mono-text text-xs text-on-surface-variant">12.00 LGR</td>
+<td class="px-6 py-3 text-xs text-on-surface-variant uppercase tracking-widest text-[10px]">Single</td>
+<td class="px-6 py-3"><span class="text-[10px] text-emerald-500 uppercase tracking-widest font-bold">Committed</span></td>
+<td class="px-6 py-3 text-right mono-text text-xs text-on-surface-variant">45ms</td>
+</tr>
+<tr class="hover:bg-surface-container transition-colors group opacity-70">
+<td class="px-6 py-3"><span class="mono-text text-xs text-on-surface-variant">0x8f2...e112</span></td>
+<td class="px-6 py-3 text-xs text-on-surface-variant">14:01:30</td>
+<td class="px-6 py-3 text-xs text-on-surface-variant">SH02 → SH03</td>
+<td class="px-6 py-3 text-right mono-text text-xs text-on-surface-variant">505.44 LGR</td>
+<td class="px-6 py-3 text-xs text-on-surface-variant uppercase tracking-widest text-[10px]">Cross</td>
+<td class="px-6 py-3"><span class="text-[10px] text-emerald-500 uppercase tracking-widest font-bold">Committed</span></td>
+<td class="px-6 py-3 text-right mono-text text-xs text-on-surface-variant">156ms</td>
+</tr>
+<tr class="hover:bg-surface-container transition-colors group opacity-60">
+<td class="px-6 py-3"><span class="mono-text text-xs text-on-surface-variant">0x4b4...a029</span></td>
+<td class="px-6 py-3 text-xs text-on-surface-variant">14:01:21</td>
+<td class="px-6 py-3 text-xs text-on-surface-variant">SH01 → SH01</td>
+<td class="px-6 py-3 text-right mono-text text-xs text-on-surface-variant">1,000.00 LGR</td>
+<td class="px-6 py-3 text-xs text-on-surface-variant uppercase tracking-widest text-[10px]">Single</td>
+<td class="px-6 py-3"><span class="text-[10px] text-emerald-500 uppercase tracking-widest font-bold">Committed</span></td>
+<td class="px-6 py-3 text-right mono-text text-xs text-on-surface-variant">38ms</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Pagination -->
+<div class="mt-6 flex items-center justify-between">
+<p class="text-xs text-on-surface-variant">Showing <span class="text-on-surface font-medium">1-25</span> of <span class="text-on-surface font-medium">1,492</span> transactions</p>
+<div class="flex gap-2">
+<button class="px-3 py-1.5 rounded bg-surface-container border border-outline-variant/10 text-on-surface-variant hover:text-on-surface">
+<span class="material-symbols-outlined text-sm">chevron_left</span>
+</button>
+<button class="px-3 py-1.5 rounded bg-primary text-on-primary text-xs font-bold">1</button>
+<button class="px-3 py-1.5 rounded bg-surface-container border border-outline-variant/10 text-on-surface-variant hover:text-on-surface text-xs">2</button>
+<button class="px-3 py-1.5 rounded bg-surface-container border border-outline-variant/10 text-on-surface-variant hover:text-on-surface text-xs">3</button>
+<span class="px-2 py-1.5 text-on-surface-variant">...</span>
+<button class="px-3 py-1.5 rounded bg-surface-container border border-outline-variant/10 text-on-surface-variant hover:text-on-surface text-xs">60</button>
+<button class="px-3 py-1.5 rounded bg-surface-container border border-outline-variant/10 text-on-surface-variant hover:text-on-surface">
+<span class="material-symbols-outlined text-sm">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Side Panel: 2PC Trace Timeline -->
+<aside class="w-80 shrink-0 sticky top-24">
+<div class="bg-surface-container-high rounded-xl p-6 border border-outline-variant/10 shadow-2xl overflow-hidden relative">
+<div class="absolute top-0 right-0 p-4">
+<span class="material-symbols-outlined text-on-surface-variant/20 text-4xl select-none" data-icon="account_tree">account_tree</span>
+</div>
+<h3 class="text-sm font-bold uppercase tracking-widest text-on-surface mb-1">Transaction Trace</h3>
+<p class="text-[10px] mono-text text-primary mb-6">TX_ID: 0x7f2...a9e1</p>
+<!-- Timeline -->
+<div class="space-y-0">
+<!-- Step 1 -->
+<div class="flex gap-4 pb-6 relative">
+<div class="absolute left-1.5 top-6 bottom-0 w-px bg-outline-variant/30"></div>
+<div class="relative z-10 w-3 h-3 rounded-full bg-emerald-500 mt-1 ring-4 ring-emerald-500/20"></div>
+<div>
+<p class="text-xs font-bold text-on-surface">Proposal phase initiated</p>
+<p class="text-[10px] text-on-surface-variant mb-1">Coordinator: Node-Alpha-01</p>
+<span class="text-[10px] px-1.5 py-0.5 rounded bg-surface-variant mono-text text-on-surface-variant">T + 0ms</span>
+</div>
+</div>
+<!-- Step 2 -->
+<div class="flex gap-4 pb-6 relative">
+<div class="absolute left-1.5 top-6 bottom-0 w-px bg-outline-variant/30"></div>
+<div class="relative z-10 w-3 h-3 rounded-full bg-emerald-500 mt-1 ring-4 ring-emerald-500/20"></div>
+<div>
+<p class="text-xs font-bold text-on-surface">Vote Requests Sent</p>
+<p class="text-[10px] text-on-surface-variant mb-1">Broadcasting to Shards 01, 03</p>
+<span class="text-[10px] px-1.5 py-0.5 rounded bg-surface-variant mono-text text-on-surface-variant">T + 14ms</span>
+</div>
+</div>
+<!-- Step 3 -->
+<div class="flex gap-4 pb-6 relative">
+<div class="absolute left-1.5 top-6 bottom-0 w-px bg-outline-variant/30"></div>
+<div class="relative z-10 w-3 h-3 rounded-full bg-emerald-500 mt-1 ring-4 ring-emerald-500/20"></div>
+<div>
+<p class="text-xs font-bold text-on-surface">Quorum Reached</p>
+<p class="text-[10px] text-on-surface-variant mb-1">All shards responded 'YES'</p>
+<span class="text-[10px] px-1.5 py-0.5 rounded bg-surface-variant mono-text text-on-surface-variant">T + 88ms</span>
+</div>
+</div>
+<!-- Step 4 -->
+<div class="flex gap-4 relative">
+<div class="relative z-10 w-3 h-3 rounded-full bg-primary mt-1 ring-4 ring-primary/20"></div>
+<div>
+<p class="text-xs font-bold text-on-surface">Commit Command Finalized</p>
+<p class="text-[10px] text-on-surface-variant mb-1">State update propagation...</p>
+<span class="text-[10px] px-1.5 py-0.5 rounded bg-primary/20 mono-text text-primary">T + 142ms</span>
+</div>
+</div>
+</div>
+<div class="mt-8 pt-6 border-t border-outline-variant/10">
+<div class="flex justify-between items-center mb-4">
+<span class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Participant Logs</span>
+<span class="text-[10px] text-primary hover:underline cursor-pointer">View Raw</span>
+</div>
+<div class="space-y-3">
+<div class="flex justify-between items-center bg-surface-container-lowest p-2 rounded">
+<span class="text-[10px] mono-text text-on-surface-variant">SH01-NODE-04</span>
+<span class="text-[10px] font-bold text-emerald-500">ACK</span>
+</div>
+<div class="flex justify-between items-center bg-surface-container-lowest p-2 rounded">
+<span class="text-[10px] mono-text text-on-surface-variant">SH03-NODE-12</span>
+<span class="text-[10px] font-bold text-emerald-500">ACK</span>
+</div>
+</div>
+</div>
+</div>
+</aside>
+</div>
+</div>
+</main>
+<!-- Contextual FAB (Hidden on transactional detail/explorer as per filter rules, but keeping as placeholder if user navigates back home) -->
+<!-- Suppressed on explorer page as per "Contextual FAB Suppression" rule -->
+</body></html>

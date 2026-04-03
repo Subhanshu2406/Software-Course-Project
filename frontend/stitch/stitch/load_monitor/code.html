@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Load Monitor | LedgerOS</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-error": "#690005",
+                        "inverse-on-surface": "#303032",
+                        "surface-container": "#201f21",
+                        "surface-variant": "#353437",
+                        "surface-tint": "#c0c1ff",
+                        "inverse-surface": "#e5e1e4",
+                        "surface-dim": "#131315",
+                        "surface": "#131315",
+                        "on-secondary-fixed": "#13144a",
+                        "on-secondary-container": "#b2b3f2",
+                        "primary-fixed": "#e1e0ff",
+                        "error": "#ffb4ab",
+                        "secondary-fixed-dim": "#c0c1ff",
+                        "surface-bright": "#39393b",
+                        "tertiary-fixed-dim": "#ffb783",
+                        "tertiary-container": "#d97721",
+                        "surface-container-lowest": "#0e0e10",
+                        "on-tertiary-fixed-variant": "#703700",
+                        "outline-variant": "#464554",
+                        "on-tertiary-container": "#452000",
+                        "on-tertiary": "#4f2500",
+                        "on-surface-variant": "#c7c4d7",
+                        "surface-container-highest": "#353437",
+                        "secondary-container": "#42447b",
+                        "surface-container-high": "#2a2a2c",
+                        "surface-container-low": "#1b1b1d",
+                        "secondary-fixed": "#e1e0ff",
+                        "on-secondary-fixed-variant": "#404178",
+                        "tertiary-fixed": "#ffdcc5",
+                        "background": "#131315",
+                        "on-background": "#e5e1e4",
+                        "primary-container": "#8083ff",
+                        "outline": "#908fa0",
+                        "on-tertiary-fixed": "#301400",
+                        "on-primary-container": "#0d0096",
+                        "on-secondary": "#292a60",
+                        "tertiary": "#ffb783",
+                        "error-container": "#93000a",
+                        "on-error-container": "#ffdad6",
+                        "on-primary-fixed": "#07006c",
+                        "on-primary": "#1000a9",
+                        "secondary": "#c0c1ff",
+                        "on-primary-fixed-variant": "#2f2ebe",
+                        "inverse-primary": "#494bd6",
+                        "primary": "#c0c1ff",
+                        "on-surface": "#e5e1e4",
+                        "primary-fixed-dim": "#c0c1ff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "fontFamily": {
+                        "headline": ["Inter"],
+                        "body": ["Inter"],
+                        "label": ["Inter"],
+                        "mono": ["JetBrains Mono"]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .tonal-shift-no-borders {
+            border: none !important;
+        }
+        .scale-98-on-click:active {
+            transform: scale(0.98);
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body selection:bg-primary-container/30">
+<div class="flex min-h-screen">
+<!-- SideNavBar - JSON Component 1 -->
+<aside class="flex flex-col h-full sticky left-0 top-0 h-screen w-[240px] border-r border-[#464554]/15 bg-[#1b1b1d] dark:bg-[#1b1b1d] tonal-shift-no-borders">
+<div class="p-6 flex items-center gap-3">
+<div class="w-8 h-8 rounded bg-primary-container flex items-center justify-center">
+<span class="material-symbols-outlined text-on-primary-container text-lg" data-weight="fill" style="font-variation-settings: 'FILL' 1;">grid_view</span>
+</div>
+<div>
+<h1 class="text-xl font-bold tracking-tighter text-[#c0c1ff]">LedgerOS</h1>
+<p class="text-[10px] uppercase tracking-widest text-on-surface-variant/60 font-medium">Cluster: Active</p>
+</div>
+</div>
+<nav class="flex-1 px-4 py-4 space-y-1">
+<a class="flex items-center gap-3 px-3 py-2.5 rounded transition-colors duration-200 text-[#a1a1aa] hover:text-[#f4f4f5] hover:bg-[#201f21] font-sans text-sm font-medium tracking-wide" href="#">
+<span class="material-symbols-outlined text-xl">analytics</span>
+                    Node Health
+                </a>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded transition-colors duration-200 text-[#c0c1ff] font-bold border-r-2 border-[#6366f1] bg-[#201f21] font-sans text-sm tracking-wide" href="#">
+<span class="material-symbols-outlined text-xl">monitoring</span>
+                    Metrics
+                </a>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded transition-colors duration-200 text-[#a1a1aa] hover:text-[#f4f4f5] hover:bg-[#201f21] font-sans text-sm font-medium tracking-wide" href="#">
+<span class="material-symbols-outlined text-xl">grid_view</span>
+                    Clusters
+                </a>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded transition-colors duration-200 text-[#a1a1aa] hover:text-[#f4f4f5] hover:bg-[#201f21] font-sans text-sm font-medium tracking-wide" href="#">
+<span class="material-symbols-outlined text-xl">description</span>
+                    System Logs
+                </a>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded transition-colors duration-200 text-[#a1a1aa] hover:text-[#f4f4f5] hover:bg-[#201f21] font-sans text-sm font-medium tracking-wide" href="#">
+<span class="material-symbols-outlined text-xl">settings_input_component</span>
+                    Protocol Config
+                </a>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded transition-colors duration-200 text-[#a1a1aa] hover:text-[#f4f4f5] hover:bg-[#201f21] font-sans text-sm font-medium tracking-wide" href="#">
+<span class="material-symbols-outlined text-xl">account_balance</span>
+                    Governance
+                </a>
+</nav>
+<div class="px-4 py-4 mt-auto space-y-4">
+<button class="w-full py-2 bg-[#6366f1] text-white text-xs font-bold uppercase tracking-widest rounded-sm scale-98-on-click">
+                    Run Invariant Check
+                </button>
+<div class="flex flex-col gap-1 border-t border-[#464554]/15 pt-4">
+<a class="flex items-center gap-3 px-3 py-2 text-[#a1a1aa] hover:text-[#f4f4f5] text-xs font-medium uppercase tracking-widest" href="#">
+<span class="material-symbols-outlined text-sm text-green-500">fiber_manual_record</span>
+                        Health
+                    </a>
+<a class="flex items-center gap-3 px-3 py-2 text-[#a1a1aa] hover:text-[#f4f4f5] text-xs font-medium uppercase tracking-widest" href="#">
+<span class="material-symbols-outlined text-sm">settings</span>
+                        Settings
+                    </a>
+</div>
+</div>
+</aside>
+<div class="flex-1 flex flex-col min-w-0">
+<!-- TopNavBar - JSON Component 2 -->
+<header class="flex justify-between items-center w-full px-6 sticky top-0 z-40 bg-[#131315]/80 backdrop-blur-xl h-16 tonal-shift-no-borders">
+<div class="flex items-center gap-8">
+<span class="text-lg font-medium text-[#f4f4f5]">LedgerOS</span>
+<nav class="hidden md:flex items-center gap-6">
+<a class="text-[#a1a1aa] hover:text-[#c0c1ff] transition-all font-sans text-sm font-medium uppercase tracking-widest" href="#">Monitoring</a>
+<a class="text-[#c0c1ff] border-b-2 border-[#6366f1] pb-4 font-sans text-sm font-medium uppercase tracking-widest mt-4" href="#">Control</a>
+<a class="text-[#a1a1aa] hover:text-[#c0c1ff] transition-all font-sans text-sm font-medium uppercase tracking-widest" href="#">Insights</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-2 mr-4">
+<span class="material-symbols-outlined text-[#a1a1aa] text-lg hover:text-[#c0c1ff] cursor-pointer">refresh</span>
+<span class="text-[10px] font-mono text-[#a1a1aa] uppercase tracking-tighter">2s Refresh</span>
+</div>
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-[#a1a1aa] hover:text-[#c0c1ff] cursor-pointer">notifications</span>
+<div class="w-8 h-8 rounded-full bg-surface-container-highest border border-outline-variant/20 flex items-center justify-center overflow-hidden">
+<img alt="User Avatar" class="w-full h-full object-cover" data-alt="minimal geometric abstract avatar for system administrator in deep indigo and violet tones" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCAvRCp7jFrooEnfAEqnDJZ1r4srMYcVoYOp4c3Or-b4frBFRPJOwdO7nqQaTSzxnwOvAlKJk2wc-xl4gF-U6fMYS5OFB9BtaKA6ubpmuZQV3P3HgHB_acxowBeobUcs_lr4aPaWrEkxfKTGo7ry15uUQzow7_9qArs3OWGTYZ3rApK2r4mVNgBkZsYLEUHAwkxHWDtzVZKOJcIqnqMAx1Ddd-UhG0I6bbQvzWT3es1y5zBP2TFrUt_0SwTl3PEAtav707-_cSEuw"/>
+</div>
+</div>
+</div>
+</header>
+<!-- Main Content Area -->
+<main class="flex-1 p-6 space-y-6 overflow-y-auto">
+<header>
+<h2 class="text-2xl font-medium tracking-tight text-[#f4f4f5]">Load Monitor</h2>
+<p class="text-sm text-on-surface-variant font-mono">/shard-orchestration/load-monitor</p>
+</header>
+<!-- Top Row Stat Cards -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+<div class="bg-surface-container-low p-6 rounded-xl border border-outline-variant/10 shadow-sm relative overflow-hidden group">
+<div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+<span class="material-symbols-outlined text-4xl text-error">local_fire_department</span>
+</div>
+<p class="text-xs font-medium uppercase tracking-widest text-on-surface-variant mb-2">Hottest Shard</p>
+<div class="flex items-end gap-2">
+<h3 class="text-3xl font-bold font-mono text-[#f4f4f5]">SHARD-082</h3>
+<span class="text-error text-xs font-mono mb-1.5 flex items-center gap-1">
+<span class="material-symbols-outlined text-xs">trending_up</span>
+                                92.4%
+                            </span>
+</div>
+<p class="text-[10px] text-on-surface-variant mt-2 font-mono">Last migration: 12s ago</p>
+</div>
+<div class="bg-surface-container-low p-6 rounded-xl border border-outline-variant/10 shadow-sm relative overflow-hidden group">
+<div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+<span class="material-symbols-outlined text-4xl text-primary">ac_unit</span>
+</div>
+<p class="text-xs font-medium uppercase tracking-widest text-on-surface-variant mb-2">Coolest Shard</p>
+<div class="flex items-end gap-2">
+<h3 class="text-3xl font-bold font-mono text-[#f4f4f5]">SHARD-014</h3>
+<span class="text-primary text-xs font-mono mb-1.5 flex items-center gap-1">
+<span class="material-symbols-outlined text-xs">trending_down</span>
+                                4.1%
+                            </span>
+</div>
+<p class="text-[10px] text-on-surface-variant mt-2 font-mono">Idle capacity: 850 tps</p>
+</div>
+<div class="bg-surface-container-low p-6 rounded-xl border border-outline-variant/10 shadow-sm relative overflow-hidden group">
+<div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+<span class="material-symbols-outlined text-4xl text-tertiary">swap_horiz</span>
+</div>
+<p class="text-xs font-medium uppercase tracking-widest text-on-surface-variant mb-2">Migrations Triggered</p>
+<div class="flex items-end gap-2">
+<h3 class="text-3xl font-bold font-mono text-[#f4f4f5]">142</h3>
+<span class="text-tertiary text-xs font-mono mb-1.5">LIVE</span>
+</div>
+<p class="text-[10px] text-on-surface-variant mt-2 font-mono">Avg delay: 420ms</p>
+</div>
+</div>
+<!-- Main Area: Chart & Controls -->
+<div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+<!-- Multi-line LineChart Area -->
+<div class="lg:col-span-3 bg-surface-container-low p-6 rounded-xl border border-outline-variant/5">
+<div class="flex justify-between items-center mb-8">
+<h3 class="text-sm font-medium uppercase tracking-widest text-on-surface-variant">Queue Depth per Shard</h3>
+<div class="flex gap-4">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-[#8083ff]"></span>
+<span class="text-[10px] font-mono text-on-surface-variant">Primary</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-green-500"></span>
+<span class="text-[10px] font-mono text-on-surface-variant">Secondary</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-amber-500"></span>
+<span class="text-[10px] font-mono text-on-surface-variant">Observer</span>
+</div>
+</div>
+</div>
+<!-- Visual representation of a Line Chart -->
+<div class="h-[320px] w-full flex items-end gap-1 relative pt-4">
+<!-- Y-Axis Labels -->
+<div class="absolute left-0 top-0 bottom-0 flex flex-col justify-between text-[10px] font-mono text-on-surface-variant/40 py-2">
+<span>500</span>
+<span>400</span>
+<span>300</span>
+<span>200</span>
+<span>100</span>
+<span>0</span>
+</div>
+<!-- Grid Lines -->
+<div class="absolute inset-0 pl-8 pointer-events-none opacity-5">
+<div class="h-full border-b border-white"></div>
+<div class="h-4/5 border-b border-white"></div>
+<div class="h-3/5 border-b border-white"></div>
+<div class="h-2/5 border-b border-white"></div>
+<div class="h-1/5 border-b border-white"></div>
+</div>
+<!-- Lines (Simulated SVG) -->
+<div class="flex-1 ml-10 h-full relative">
+<svg class="w-full h-full" preserveaspectratio="none" viewbox="0 0 1000 320">
+<!-- Primary Shard (Indigo) -->
+<path d="M0,280 Q100,240 200,260 T400,180 T600,220 T800,100 T1000,140" fill="none" stroke="#8083ff" stroke-width="2"></path>
+<!-- Secondary Shard (Green) -->
+<path d="M0,300 Q150,280 300,290 T500,270 T750,295 T1000,285" fill="none" stroke="#22c55e" stroke-dasharray="4" stroke-width="2"></path>
+<!-- Observer Shard (Amber) -->
+<path d="M0,310 Q200,300 400,305 T700,302 T1000,310" fill="none" stroke="#f59e0b" stroke-width="2"></path>
+</svg>
+<!-- X-Axis Labels -->
+<div class="absolute -bottom-6 w-full flex justify-between text-[10px] font-mono text-on-surface-variant/40">
+<span>-60s</span>
+<span>-45s</span>
+<span>-30s</span>
+<span>-15s</span>
+<span>Now</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Manual Controls -->
+<div class="lg:col-span-1 space-y-6">
+<div class="bg-surface-container p-6 rounded-xl border border-outline-variant/10">
+<h3 class="text-xs font-bold uppercase tracking-widest text-on-surface-variant mb-6 flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">tune</span>
+                                Manual Override
+                            </h3>
+<div class="space-y-8">
+<div>
+<div class="flex justify-between items-center mb-4">
+<label class="text-[10px] font-mono text-on-surface-variant">THRESHOLD_LIMIT</label>
+<span class="text-xs font-bold font-mono text-primary">240 ms</span>
+</div>
+<input class="w-full h-1.5 bg-surface-container-highest rounded-lg appearance-none cursor-pointer accent-primary" max="500" min="10" type="range" value="240"/>
+<div class="flex justify-between mt-2 text-[10px] font-mono text-on-surface-variant/40">
+<span>10</span>
+<span>500</span>
+</div>
+</div>
+<div class="space-y-3 pt-4">
+<button class="w-full py-3 bg-gradient-to-r from-primary to-primary-container text-on-primary-container text-xs font-bold uppercase tracking-widest rounded-md scale-98-on-click flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-sm">bolt</span>
+                                        Force Rebalance
+                                    </button>
+<button class="w-full py-3 border border-outline-variant/20 text-on-surface text-xs font-bold uppercase tracking-widest rounded-md scale-98-on-click flex items-center justify-center gap-2 hover:bg-surface-variant/10 transition-colors">
+<span class="material-symbols-outlined text-sm">history</span>
+                                        Dry Run
+                                    </button>
+</div>
+</div>
+</div>
+<!-- System Status Micro-card -->
+<div class="bg-primary/5 p-4 rounded-xl border border-primary/20 flex items-center gap-4">
+<div class="relative flex h-3 w-3">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+<span class="relative inline-flex rounded-full h-3 w-3 bg-primary"></span>
+</div>
+<div class="min-w-0">
+<p class="text-[10px] font-bold uppercase tracking-widest text-primary">Auto-scaling enabled</p>
+<p class="text-[10px] text-on-surface-variant font-mono truncate">Ready for overflow migration</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Migration Log (Below Chart) -->
+<section class="bg-surface-container-low rounded-xl border border-outline-variant/5 overflow-hidden">
+<div class="px-6 py-4 flex justify-between items-center border-b border-outline-variant/10">
+<h3 class="text-sm font-medium uppercase tracking-widest text-on-surface-variant flex items-center gap-2">
+<span class="material-symbols-outlined text-lg">list_alt</span>
+                            Migration Log
+                        </h3>
+<div class="flex items-center gap-2 px-3 py-1 bg-surface-container rounded-full border border-outline-variant/10">
+<span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+<span class="text-[10px] font-mono text-on-surface-variant">STREAMING LIVE</span>
+</div>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="text-[10px] font-mono text-on-surface-variant/60 uppercase tracking-widest border-b border-outline-variant/10">
+<th class="px-6 py-4 font-normal">Timestamp</th>
+<th class="px-6 py-4 font-normal">Partition ID</th>
+<th class="px-6 py-4 font-normal">Source</th>
+<th class="px-6 py-4 font-normal">Target</th>
+<th class="px-6 py-4 font-normal">Data Volume</th>
+<th class="px-6 py-4 font-normal">Status</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant/5">
+<tr class="hover:bg-surface-container transition-colors">
+<td class="px-6 py-4 font-mono text-xs text-on-surface-variant">14:22:01.882</td>
+<td class="px-6 py-4 font-mono text-xs text-[#f4f4f5]">p_ax9820-k</td>
+<td class="px-6 py-4 font-mono text-xs text-error">SHARD-082</td>
+<td class="px-6 py-4 font-mono text-xs text-primary">SHARD-014</td>
+<td class="px-6 py-4 font-mono text-xs text-on-surface-variant">2.4 TB</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-green-500/10 text-green-400 text-[10px] font-mono font-bold uppercase">
+<span class="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                                            Complete
+                                        </span>
+</td>
+</tr>
+<tr class="hover:bg-surface-container transition-colors">
+<td class="px-6 py-4 font-mono text-xs text-on-surface-variant">14:21:44.201</td>
+<td class="px-6 py-4 font-mono text-xs text-[#f4f4f5]">p_zx1122-f</td>
+<td class="px-6 py-4 font-mono text-xs text-error">SHARD-082</td>
+<td class="px-6 py-4 font-mono text-xs text-primary">SHARD-042</td>
+<td class="px-6 py-4 font-mono text-xs text-on-surface-variant">840 GB</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-green-500/10 text-green-400 text-[10px] font-mono font-bold uppercase">
+<span class="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                                            Complete
+                                        </span>
+</td>
+</tr>
+<tr class="hover:bg-surface-container transition-colors">
+<td class="px-6 py-4 font-mono text-xs text-on-surface-variant">14:21:30.551</td>
+<td class="px-6 py-4 font-mono text-xs text-[#f4f4f5]">p_mm0092-r</td>
+<td class="px-6 py-4 font-mono text-xs text-tertiary">SHARD-055</td>
+<td class="px-6 py-4 font-mono text-xs text-primary">SHARD-014</td>
+<td class="px-6 py-4 font-mono text-xs text-on-surface-variant">1.1 TB</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 text-[10px] font-mono font-bold uppercase">
+<span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+                                            In Transit
+                                        </span>
+</td>
+</tr>
+<tr class="hover:bg-surface-container transition-colors">
+<td class="px-6 py-4 font-mono text-xs text-on-surface-variant">14:19:12.002</td>
+<td class="px-6 py-4 font-mono text-xs text-[#f4f4f5]">p_kl7831-q</td>
+<td class="px-6 py-4 font-mono text-xs text-error">SHARD-082</td>
+<td class="px-6 py-4 font-mono text-xs text-primary">SHARD-014</td>
+<td class="px-6 py-4 font-mono text-xs text-on-surface-variant">4.2 TB</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-error/10 text-error text-[10px] font-mono font-bold uppercase">
+<span class="w-1.5 h-1.5 rounded-full bg-error"></span>
+                                            Failed
+                                        </span>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="px-6 py-4 bg-surface-container-highest/20 border-t border-outline-variant/5">
+<button class="text-[10px] font-bold uppercase tracking-widest text-primary flex items-center gap-1 hover:gap-2 transition-all">
+                            View Full Migration History
+                            <span class="material-symbols-outlined text-[12px]">arrow_forward</span>
+</button>
+</div>
+</section>
+</main>
+</div>
+</div>
+</body></html>
