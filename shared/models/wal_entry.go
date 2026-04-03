@@ -29,9 +29,33 @@ type WALEntry struct {
 // ShardMetrics is reported by each shard to the Load Monitor.
 // Used by REQ-DATA-003 (load balancing) and REQ-REP-003 (heartbeat).
 type ShardMetrics struct {
-	ShardID        string  `json:"shard_id"`
-	CPUUsage       float64 `json:"cpu_usage"`        // 0.0 - 1.0
-	TotalQPS       float64 `json:"total_qps"`        // transactions per second
-	QueueDepth     int     `json:"queue_depth"`      // pending requests
-	ReplicationLag int     `json:"replication_lag"`  // entries not yet replicated
+	ShardID             string  `json:"shard_id"`
+	Role                string  `json:"role"`
+	CPUUsage            float64 `json:"cpu_usage"`
+	TotalQPS            float64 `json:"total_qps"`
+	QueueDepth          int     `json:"queue_depth"`
+	ReplicationLag      int     `json:"replication_lag"`
+	WALIndex            uint64  `json:"wal_index"`
+	LastCheckpointLogID uint64  `json:"last_checkpoint_log_id"`
+	FollowerCount       int     `json:"follower_count"`
+	AccountCount        int     `json:"account_count"`
+	TotalBalance        int64   `json:"total_balance"`
+	UptimeSeconds       int64   `json:"uptime_seconds"`
+	CommittedCount      int64   `json:"committed_count"`
+	AbortedCount        int64   `json:"aborted_count"`
+	PreparedCount       int64   `json:"prepared_count"`
+}
+
+// TxnSummary is a lightweight transaction record for recent-transaction feeds.
+type TxnSummary struct {
+	TxnID       string                     `json:"txn_id"`
+	Source      string                     `json:"source"`
+	Destination string                     `json:"destination"`
+	Amount      int64                      `json:"amount"`
+	Type        string                     `json:"type"`
+	State       constants.TransactionState `json:"state"`
+	LatencyMs   int64                      `json:"latency_ms"`
+	Timestamp   time.Time                  `json:"timestamp"`
+	ShardID     string                     `json:"shard_id"`
+	Shards      []string                   `json:"shards,omitempty"`
 }
