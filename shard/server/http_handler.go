@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 	"time"
 
 	"ledger-service/shared/constants"
@@ -92,6 +93,9 @@ func (h *HTTPHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/balance", h.handleBalance)
 	mux.HandleFunc("/health", h.handleHealth)
 	mux.HandleFunc("/metrics", h.handleMetrics)
+	mux.HandleFunc("/metrics/prometheus", h.handlePrometheusMetrics)
+	mux.HandleFunc("/wal", h.handleWAL)
+	mux.HandleFunc("/transactions", h.handleTransactions)
 	mux.HandleFunc("/halt-partition", h.handleHaltPartition)
 	mux.HandleFunc("/receive-partition", h.handleReceivePartition)
 	mux.HandleFunc("/resume-partition", h.handleResumePartition)
@@ -295,6 +299,73 @@ func (h *HTTPHandler) handlePromote(w http.ResponseWriter, r *http.Request) {
 func (h *HTTPHandler) handleLogIndex(w http.ResponseWriter, r *http.Request) {
 	logID := h.server.WAL().NextLogID()
 	writeJSON(w, http.StatusOK, map[string]uint64{"last_log_id": logID})
+}
+
+func (h *HTTPHandler) handleWAL(w http.ResponseWriter, r *http.Request) {
+	limit := 50
+	if l := r.URL.Query().Get("limit"); l != "" {
+		if v, err := strconv.Atoi(l); err == nil && v > 0 {
+			limit = v
+		}
+	}
+	entries, total, cpID, err := h.server.GetWALEntries(limit)
+	if err != nil {
+		writeErrorJSON(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"shard_id":              h.server.ShardID(),
+		"entries":               entries,
+		"total_entries":         total,
+		"last_checkpoint_log_id": cpID,
+	})
+}
+
+func (h *HTTPHandler) handleTransactions(w http.ResponseWriter, r *http.Request) {
+	limit := 25
+	if l := r.URL.Query().Get("limit"); l != "" {
+		if v, err := strconv.Atoi(l); err == nil && v > 0 {
+			limit = v
+		}
+	}
+	txns := h.server.GetRecentTxns(limit)
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"shard_id":     h.server.ShardID(),
+		"transactions": txns,
+		"total":        len(txns),
+	})
+}
+
+func (h *HTTPHandler) handlePrometheusMetrics(w http.ResponseWriter, r *http.Request) {
+	m := h.server.GetMetrics()
+	w.Header().Set("Content-Type", "text/plain; version=0.0.4")
+	fmt.Fprintf(w, "# HELP ledger_queue_depth Current transaction queue depth\n")
+	fmt.Fprintf(w, "# TYPE ledger_queue_depth gauge\n")
+	fmt.Fprintf(w, "ledger_queue_depth{shard=\"%s\",role=\"%s\"} %d\n", m.ShardID, m.Role, m.QueueDepth)
+	fmt.Fprintf(w, "# HELP ledger_wal_index Current WAL log index\n")
+	fmt.Fprintf(w, "# TYPE ledger_wal_index gauge\n")
+	fmt.Fprintf(w, "ledger_wal_index{shard=\"%s\"} %d\n", m.ShardID, m.WALIndex)
+	fmt.Fprintf(w, "# HELP ledger_tps Transactions per second\n")
+	fmt.Fprintf(w, "# TYPE ledger_tps gauge\n")
+	fmt.Fprintf(w, "ledger_tps{shard=\"%s\"} %.2f\n", m.ShardID, m.TotalQPS)
+	fmt.Fprintf(w, "# HELP ledger_committed_total Total committed transactions\n")
+	fmt.Fprintf(w, "# TYPE ledger_committed_total counter\n")
+	fmt.Fprintf(w, "ledger_committed_total{shard=\"%s\"} %d\n", m.ShardID, m.CommittedCount)
+	fmt.Fprintf(w, "# HELP ledger_aborted_total Total aborted transactions\n")
+	fmt.Fprintf(w, "# TYPE ledger_aborted_total counter\n")
+	fmt.Fprintf(w, "ledger_aborted_total{shard=\"%s\"} %d\n", m.ShardID, m.AbortedCount)
+	fmt.Fprintf(w, "# HELP ledger_account_count Number of accounts\n")
+	fmt.Fprintf(w, "# TYPE ledger_account_count gauge\n")
+	fmt.Fprintf(w, "ledger_account_count{shard=\"%s\"} %d\n", m.ShardID, m.AccountCount)
+	fmt.Fprintf(w, "# HELP ledger_total_balance Total balance across all accounts\n")
+	fmt.Fprintf(w, "# TYPE ledger_total_balance gauge\n")
+	fmt.Fprintf(w, "ledger_total_balance{shard=\"%s\"} %d\n", m.ShardID, m.TotalBalance)
+	fmt.Fprintf(w, "# HELP ledger_replication_lag Replication lag in entries\n")
+	fmt.Fprintf(w, "# TYPE ledger_replication_lag gauge\n")
+	fmt.Fprintf(w, "ledger_replication_lag{shard=\"%s\"} %d\n", m.ShardID, m.ReplicationLag)
+	fmt.Fprintf(w, "# HELP ledger_uptime_seconds Shard uptime in seconds\n")
+	fmt.Fprintf(w, "# TYPE ledger_uptime_seconds gauge\n")
+	fmt.Fprintf(w, "ledger_uptime_seconds{shard=\"%s\"} %d\n", m.ShardID, m.UptimeSeconds)
 }
 
 func (h *HTTPHandler) handleCreateAccount(w http.ResponseWriter, r *http.Request) {

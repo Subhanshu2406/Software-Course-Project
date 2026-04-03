@@ -17,6 +17,8 @@ import (
 	"fmt"
 	"log"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	"ledger-service/shared/constants"
 	"ledger-service/shared/models"
@@ -43,9 +45,17 @@ type ShardServer struct {
 	role       string // "PRIMARY" or "FOLLOWER"
 
 	// seenTxns tracks transaction IDs to enforce idempotency.
-	// If a txnID is re-submitted (e.g. due to coordinator retry), we return
-	// the cached result rather than double-applying.
 	seenTxns map[string]constants.TransactionState
+
+	// Metrics counters
+	committedCount atomic.Int64
+	abortedCount   atomic.Int64
+	preparedCount  atomic.Int64
+	startTime      time.Time
+	followerCount  int
+
+	// Recent transactions ring buffer (cap 500)
+	recentTxns []models.TxnSummary
 }
 
 // NewShardServer creates a new shard server, replaying the WAL if one exists.
@@ -80,10 +90,12 @@ func NewShardServer(shardID, walPath string, initialBalances map[string]int64) (
 	}
 
 	s := &ShardServer{
-		shardID:  shardID,
-		walLog:   w,
-		ledger:   l,
-		seenTxns: make(map[string]constants.TransactionState),
+		shardID:    shardID,
+		walLog:     w,
+		ledger:     l,
+		seenTxns:   make(map[string]constants.TransactionState),
+		startTime:  time.Now(),
+		recentTxns: make([]models.TxnSummary, 0, 500),
 	}
 
 	// Replay WAL to recover state from any previous run
@@ -181,9 +193,12 @@ func (s *ShardServer) ExecuteSingleShard(txn models.Transaction) (models.Transac
 		}, nil
 	}
 
+	txnStart := time.Now()
+
 	// Step 1: Validate — check source balance before touching anything
 	if err := s.ledger.ValidateDebit(txn.Source, txn.Amount); err != nil {
 		s.seenTxns[txn.TxnID] = constants.StateAborted
+		s.abortedCount.Add(1)
 
 		// Write ABORTED to WAL so recovery knows this was rejected
 		_ = s.walLog.MarkAborted(txn.TxnID)
@@ -241,6 +256,12 @@ func (s *ShardServer) ExecuteSingleShard(txn models.Transaction) (models.Transac
 	}
 
 	s.seenTxns[txn.TxnID] = constants.StateCommitted
+	s.committedCount.Add(1)
+	s.addRecentTxn(models.TxnSummary{
+		TxnID: txn.TxnID, Source: txn.Source, Destination: txn.Destination,
+		Amount: txn.Amount, Type: "single", State: constants.StateCommitted,
+		LatencyMs: time.Since(txnStart).Milliseconds(), Timestamp: time.Now().UTC(), ShardID: s.shardID,
+	})
 
 	log.Printf("shard %s: txn %s COMMITTED (debit %s, credit %s, amount %d)",
 		s.shardID, txn.TxnID, txn.Source, txn.Destination, txn.Amount)
@@ -280,6 +301,7 @@ func (s *ShardServer) PrepareTransaction(txnID string, opType constants.Operatio
 	}
 
 	s.seenTxns[txnID] = constants.StatePrepared
+	s.preparedCount.Add(1)
 	log.Printf("shard %s: txn %s PREPARED (%s %s amount %d)", s.shardID, txnID, opType, accountID, amount)
 	return nil
 }
@@ -325,6 +347,12 @@ func (s *ShardServer) CommitTransaction(txnID string, opType constants.Operation
 	}
 
 	s.seenTxns[txnID] = constants.StateCommitted
+	s.committedCount.Add(1)
+	s.addRecentTxn(models.TxnSummary{
+		TxnID: txnID, Source: accountID, Destination: "",
+		Amount: amount, Type: "cross", State: constants.StateCommitted,
+		Timestamp: time.Now().UTC(), ShardID: s.shardID,
+	})
 	return nil
 }
 
@@ -349,6 +377,7 @@ func (s *ShardServer) AbortTransaction(txnID string, opType constants.OperationT
 	}
 
 	s.seenTxns[txnID] = constants.StateAborted
+	s.abortedCount.Add(1)
 	return nil
 }
 
@@ -393,17 +422,79 @@ func (s *ShardServer) Snapshot() map[string]int64 {
 	return s.ledger.Snapshot()
 }
 
-// GetMetrics returns some mock CPU usage, and the number of seen txns as queue depth.
+// GetMetrics returns expanded shard metrics including counters and balances.
 func (s *ShardServer) GetMetrics() models.ShardMetrics {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return models.ShardMetrics{
-		ShardID:      s.shardID,
-		CPUUsage:     20.5,
-		TotalQPS:     100.0,
-		QueueDepth:   len(s.seenTxns), // using this as a proxy for load
-		ReplicationLag: 0,
+	followerCount := s.followerCount
+	if s.replicator != nil && followerCount == 0 {
+		followerCount = 2 // default assumption
 	}
+	return models.ShardMetrics{
+		ShardID:             s.shardID,
+		Role:                s.role,
+		CPUUsage:            20.5,
+		TotalQPS:            float64(s.committedCount.Load()+s.abortedCount.Load()) / max(time.Since(s.startTime).Seconds(), 1),
+		QueueDepth:          len(s.seenTxns),
+		ReplicationLag:      0,
+		WALIndex:            s.walLog.NextLogID(),
+		LastCheckpointLogID: 0,
+		FollowerCount:       followerCount,
+		AccountCount:        s.ledger.AccountCount(),
+		TotalBalance:        s.ledger.TotalBalance(),
+		UptimeSeconds:       int64(time.Since(s.startTime).Seconds()),
+		CommittedCount:      s.committedCount.Load(),
+		AbortedCount:        s.abortedCount.Load(),
+		PreparedCount:       s.preparedCount.Load(),
+	}
+}
+
+// addRecentTxn appends a transaction summary to the ring buffer (cap 500).
+// Caller must hold s.mu.
+func (s *ShardServer) addRecentTxn(t models.TxnSummary) {
+	if len(s.recentTxns) >= 500 {
+		s.recentTxns = s.recentTxns[1:]
+	}
+	s.recentTxns = append(s.recentTxns, t)
+}
+
+// GetRecentTxns returns the last `limit` transactions.
+func (s *ShardServer) GetRecentTxns(limit int) []models.TxnSummary {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	n := len(s.recentTxns)
+	if limit > n {
+		limit = n
+	}
+	out := make([]models.TxnSummary, limit)
+	copy(out, s.recentTxns[n-limit:])
+	return out
+}
+
+// GetWALEntries returns the last `limit` WAL entries plus total count and last checkpoint ID.
+func (s *ShardServer) GetWALEntries(limit int) (entries []models.WALEntry, total uint64, lastCpID uint64, err error) {
+	allEntries, err := s.walLog.ReadAll()
+	if err != nil {
+		return nil, 0, 0, err
+	}
+	total = uint64(len(allEntries))
+	for i := len(allEntries) - 1; i >= 0; i-- {
+		if allEntries[i].CheckpointLogID > 0 {
+			lastCpID = allEntries[i].CheckpointLogID
+			break
+		}
+	}
+	if limit > 0 && limit < len(allEntries) {
+		allEntries = allEntries[len(allEntries)-limit:]
+	}
+	return allEntries, total, lastCpID, nil
+}
+
+// SetFollowerCount sets the reported follower count.
+func (s *ShardServer) SetFollowerCount(n int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.followerCount = n
 }
 
 // HaltAndSnapshotPartition stops processing for a partition and returns its balances.
