@@ -163,3 +163,13 @@ func writeError(w http.ResponseWriter, status int, message string) {
 	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(map[string]string{"error": message})
 }
+
+// HandleSubmitDirect exposes handleSubmit for use by an external mux.
+func (c *HTTPConsumer) HandleSubmitDirect(w http.ResponseWriter, r *http.Request) {
+	c.handleSubmit(w, r)
+}
+
+// HandleStatusDirect exposes handleStatus for use by an external mux.
+func (c *HTTPConsumer) HandleStatusDirect(w http.ResponseWriter, r *http.Request) {
+	c.handleStatus(w, r)
+}
