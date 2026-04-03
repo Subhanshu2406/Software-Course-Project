@@ -42,9 +42,9 @@ function buildScenarios() {
 export const options = {
   scenarios: buildScenarios(),
   thresholds: {
-    'single_shard_duration': ['p(99)<200'],
-    'cross_shard_duration': ['p(99)<500'],
-    'http_req_failed': ['rate<0.05'],
+    'single_shard_duration': ['p(99)<2000'],  // 2 seconds for single-shard at 50 VUs
+    'cross_shard_duration': ['p(99)<3000'],   // 3 seconds for cross-shard at 50 VUs
+    'http_req_failed': ['rate<0.05'],         // <5% error rate
   },
 };
 

@@ -1,8 +1,14 @@
+# ---- Windows Git Bash / MSYS2 Path Conversion Fix ----
+MSYS_NO_PATHCONV := 1
+export MSYS_NO_PATHCONV
+
+LOADTEST_VOL := /$(subst :,,$(CURDIR))/loadtest
+
 include .env
 export
 
 .PHONY: build up down seed token gen-config unit-test \
-        test-health test-load-single test-load-cross test-load-mixed \
+        test-health test-load test-load-single test-load-cross test-load-mixed \
         test-concurrency test-recovery test-follower-kill test-leader-failover \
         test-coordinator-kill test-multi-coordinator test-migration test-scale \
         test-invariant test-all test-fast report clean \
@@ -61,7 +67,7 @@ define run_k6
 	  -e LOAD_DURATION=$(LOAD_DURATION) \
 	  -e SCENARIO=$(1) \
 	  -e RESULTS_FILE=/scripts/$(2) \
-	  -v "$$(pwd)/loadtest:/scripts" \
+	  -v "$(LOADTEST_VOL):/scripts" \
 	  grafana/k6 run /scripts/load.js
 endef
 
@@ -84,7 +90,10 @@ test-health:
 	echo "PASS=$$PASS  FAIL=$$FAIL"; \
 	if [ $$FAIL -eq 0 ]; then echo "[PASS] T1 Health"; else echo "[FAIL] T1 Health"; exit 1; fi
 
-# T2 — Single-shard load
+# T2 — All load tests (single, cross, mixed)
+test-load: test-load-single test-load-cross test-load-mixed
+
+# T2a — Single-shard load
 test-load-single:
 	@echo ""; echo "=== T2: Load – single-shard ==="
 	$(call run_k6,single_shard,results_single.json)
