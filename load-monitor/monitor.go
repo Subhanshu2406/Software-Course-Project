@@ -150,5 +150,18 @@ func (m *LoadMonitor) migratePartition(hot shardmap.ShardInfo, cool shardmap.Sha
 
 // HandleHealth returns dummy health.
 func (m *LoadMonitor) HandleHealth(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+}
+
+// GetMetrics returns the current snapshot of per-shard metrics.
+func (m *LoadMonitor) GetMetrics() map[string]models.ShardMetrics {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	result := make(map[string]models.ShardMetrics, len(m.metrics))
+	for k, v := range m.metrics {
+		result[k] = v
+	}
+	return result
 }
