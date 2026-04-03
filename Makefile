@@ -5,7 +5,8 @@ export
         test-health test-load-single test-load-cross test-load-mixed \
         test-concurrency test-recovery test-follower-kill test-leader-failover \
         test-coordinator-kill test-multi-coordinator test-migration test-scale \
-        test-invariant test-all test-fast report clean
+        test-invariant test-all test-fast report clean \
+        frontend-dev frontend-build open open-grafana open-prometheus token-set
 
 # ---- Build ----
 build:
@@ -48,7 +49,7 @@ unit-test:
 
 # ---- K6 helper (internal) ----
 # Usage: $(call run_k6,SCENARIO,RESULTS_FILE)
-NETWORK_NAME = $(shell docker network ls --format '{{.Name}}' | grep ledger-net | head -1)
+NETWORK_NAME = $(shell docker network ls --format '{{.Name}}' | grep software-course-project | head -1)
 TOKEN = $(shell go run cmd/devtoken/main.go 2>/dev/null)
 define run_k6
 	docker run --rm -i \
@@ -202,3 +203,29 @@ clean:
 	docker compose down -v --remove-orphans --rmi local 2>/dev/null || true
 	rm -f loadtest/results*.json
 	rm -rf data/ logs/
+
+# ---- Frontend ----
+frontend-dev:
+	cd frontend && npm install && npm run dev
+
+frontend-build:
+	cd frontend && npm install && npm run build
+
+# ---- Open in browser ----
+open:
+	@echo "Opening frontend at http://localhost:3000"
+	@start http://localhost:3000 2>/dev/null || open http://localhost:3000 2>/dev/null || xdg-open http://localhost:3000 2>/dev/null || true
+
+open-grafana:
+	@echo "Opening Grafana at http://localhost:3001"
+	@start http://localhost:3001 2>/dev/null || open http://localhost:3001 2>/dev/null || xdg-open http://localhost:3001 2>/dev/null || true
+
+open-prometheus:
+	@echo "Opening Prometheus at http://localhost:9090"
+	@start http://localhost:9090 2>/dev/null || open http://localhost:9090 2>/dev/null || xdg-open http://localhost:9090 2>/dev/null || true
+
+# ---- Token management ----
+token-set:
+	@TOKEN=$$(go run cmd/devtoken/main.go 2>/dev/null); \
+	echo "Token: $$TOKEN"; \
+	echo "Set in browser localStorage: localStorage.setItem('ledger_token', '$$TOKEN')"
