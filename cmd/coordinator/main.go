@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"time"
 
 	"ledger-service/coordinator/consumer"
@@ -15,42 +16,77 @@ import (
 	"ledger-service/shared/utils"
 )
 
+func envOrDefault(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return fallback
+}
+
 func main() {
-	// Initialize Dependencies
-	shardMap, err := shardmap.NewShardMap("shard_map.json", []shardmap.ShardInfo{
-		{ShardID: "shard1", Address: "localhost:8081", Role: "PRIMARY"},
-		{ShardID: "shard2", Address: "localhost:8082", Role: "PRIMARY"},
-	}, 10)
+	addr := envOrDefault("COORDINATOR_ADDR", ":8080")
+	shardMapPath := envOrDefault("SHARD_MAP_PATH", "./config/shard_map.json")
+	consumerType := envOrDefault("CONSUMER_TYPE", "http")
+	kafkaBrokers := envOrDefault("KAFKA_BROKERS", "kafka:9092")
+	kafkaTopic := envOrDefault("KAFKA_TOPIC", "transactions")
+
+	// Load shard map from JSON file
+	shardMap, err := shardmap.LoadShardMap(shardMapPath)
 	if err != nil {
-		log.Fatalf("failed to init shard map: %v", err)
+		log.Fatalf("failed to load shard map from %s: %v", shardMapPath, err)
 	}
 
-	mapper := utils.NewPartitionMapper(10)
-	client := messaging.NewShardClient(5 * time.Second)
+	totalPartitions := shardMap.PartitionCount()
+	if totalPartitions == 0 {
+		log.Fatalf("shard map at %s has no partitions", shardMapPath)
+	}
 
+	mapper := utils.NewPartitionMapper(totalPartitions)
+	client := messaging.NewShardClient(5 * time.Second)
 	txnRouter := router.NewRouter(shardMap, mapper, client)
 
-	// Since prompt asks for KafkaConsumer replacing HTTPConsumer:
-	kafkaCons := consumer.NewKafkaConsumer([]string{"localhost:9092"}, "transactions", "coordinator-group", txnRouter)
-	
-	// Start Kafka consumer in background
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	kafkaCons.Start(ctx)
 
-	// Keep an HTTP server alive for status/health checks that API gateway forwards to
+	// Create HTTP mux for health and submit endpoints
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"status":"ok"}`))
 	})
 
+	var httpConsumer *consumer.HTTPConsumer
+
+	if consumerType == "kafka" {
+		// Kafka consumer mode
+		brokers := strings.Split(kafkaBrokers, ",")
+		kafkaCons := consumer.NewKafkaConsumer(brokers, kafkaTopic, "coordinator-group", txnRouter)
+		kafkaCons.Start(ctx)
+		defer kafkaCons.Stop()
+
+		// Also wire up HTTP /submit for direct submissions
+		httpConsumer = consumer.NewHTTPConsumer(addr, txnRouter)
+		mux.HandleFunc("/submit", httpConsumer.HandleSubmitDirect)
+		mux.HandleFunc("/status", httpConsumer.HandleStatusDirect)
+
+		log.Printf("Coordinator: Kafka consumer (%s, topic=%s) + HTTP on %s", kafkaBrokers, kafkaTopic, addr)
+	} else {
+		// HTTP consumer mode (default)
+		httpConsumer = consumer.NewHTTPConsumer(addr, txnRouter)
+		mux.HandleFunc("/submit", httpConsumer.HandleSubmitDirect)
+		mux.HandleFunc("/status", httpConsumer.HandleStatusDirect)
+
+		log.Printf("Coordinator: HTTP consumer on %s", addr)
+	}
+
 	server := &http.Server{
-		Addr:    ":8080",
+		Addr:    addr,
 		Handler: mux,
 	}
 
 	go func() {
-		log.Println("Coordinator listening on :8080")
+		log.Printf("Coordinator listening on %s", addr)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("listen: %s\n", err)
 		}
@@ -62,5 +98,4 @@ func main() {
 
 	log.Println("Shutting down coordinator...")
 	server.Shutdown(context.Background())
-	kafkaCons.Stop()
 }
