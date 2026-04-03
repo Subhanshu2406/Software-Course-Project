@@ -1,0 +1,366 @@
+services:
+  # ---- Infrastructure ----
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "2181"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    healthcheck:
+      test: ["CMD", "kafka-topics", "--bootstrap-server", "localhost:9092", "--list"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # ---- API Gateway ----
+  api-gateway:
+    build:
+      context: .
+      args:
+        BINARY: api
+    ports:
+      - "8000:8000"
+    environment:
+      API_ADDR: ":8000"
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_TOPIC: transactions
+      COORDINATOR_URL: "http://coordinator:8080"
+    depends_on:
+      kafka:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # ---- Coordinator 1 (always active) ----
+  coordinator:
+    build:
+      context: .
+      args:
+        BINARY: coordinator
+    ports:
+      - "8080:8080"
+    environment:
+      COORDINATOR_ADDR: ":8080"
+      SHARD_MAP_PATH: /app/config/shard_map.json
+      CONSUMER_TYPE: kafka
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_TOPIC: transactions
+    volumes:
+      - ./config:/app/config:ro
+    depends_on:
+      kafka:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # ---- Coordinator 2 (multi-coordinator profile) ----
+  coordinator2:
+    profiles: ["multi-coordinator"]
+    build:
+      context: .
+      args:
+        BINARY: coordinator
+    ports:
+      - "8079:8080"
+    environment:
+      COORDINATOR_ADDR: ":8080"
+      SHARD_MAP_PATH: /app/config/shard_map.json
+      CONSUMER_TYPE: kafka
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_TOPIC: transactions
+    volumes:
+      - ./config:/app/config:ro
+    depends_on:
+      kafka:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # ---- Shard 1 (always active) ----
+  shard1:
+    build:
+      context: .
+      args:
+        BINARY: shard
+    ports:
+      - "8081:8081"
+    environment:
+      SHARD_ID: shard1
+      SHARD_ADDR: ":8081"
+      SHARD_WAL_PATH: /app/data/shard.wal
+      SHARD_STORE_PATH: /app/data/shard_state.json
+      SHARD_ROLE: PRIMARY
+      SHARD_PARTITIONS: "${SHARD1_PARTITIONS:-0,1,2,3,4,5,6,7,8,9}"
+      SHARD_FOLLOWER_ADDRS: "shard1a:9081,shard1b:9082"
+      SHARD_QUORUM_SIZE: "2"
+      SHARD_TOTAL_PARTITIONS: "${TOTAL_PARTITIONS:-30}"
+    volumes:
+      - shard1-data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # ---- Shard 2 (two-shards or three-shards profile) ----
+  shard2:
+    profiles: ["two-shards", "three-shards"]
+    build:
+      context: .
+      args:
+        BINARY: shard
+    ports:
+      - "8082:8082"
+    environment:
+      SHARD_ID: shard2
+      SHARD_ADDR: ":8082"
+      SHARD_WAL_PATH: /app/data/shard.wal
+      SHARD_STORE_PATH: /app/data/shard_state.json
+      SHARD_ROLE: PRIMARY
+      SHARD_PARTITIONS: "${SHARD2_PARTITIONS:-10,11,12,13,14,15,16,17,18,19}"
+      SHARD_FOLLOWER_ADDRS: "shard2a:9083,shard2b:9084"
+      SHARD_QUORUM_SIZE: "2"
+      SHARD_TOTAL_PARTITIONS: "${TOTAL_PARTITIONS:-30}"
+    volumes:
+      - shard2-data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # ---- Shard 3 (three-shards profile only) ----
+  shard3:
+    profiles: ["three-shards"]
+    build:
+      context: .
+      args:
+        BINARY: shard
+    ports:
+      - "8083:8083"
+    environment:
+      SHARD_ID: shard3
+      SHARD_ADDR: ":8083"
+      SHARD_WAL_PATH: /app/data/shard.wal
+      SHARD_STORE_PATH: /app/data/shard_state.json
+      SHARD_ROLE: PRIMARY
+      SHARD_PARTITIONS: "${SHARD3_PARTITIONS:-20,21,22,23,24,25,26,27,28,29}"
+      SHARD_FOLLOWER_ADDRS: "shard3a:9085,shard3b:9086"
+      SHARD_QUORUM_SIZE: "2"
+      SHARD_TOTAL_PARTITIONS: "${TOTAL_PARTITIONS:-30}"
+    volumes:
+      - shard3-data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8083/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # ---- Shard 1 Followers ----
+  shard1a:
+    profiles: ["followers"]
+    build:
+      context: .
+      args:
+        BINARY: shard
+    ports:
+      - "9081:9081"
+    environment:
+      SHARD_ID: shard1a
+      SHARD_ADDR: ":9081"
+      SHARD_WAL_PATH: /app/data/shard.wal
+      SHARD_STORE_PATH: /app/data/shard_state.json
+      SHARD_ROLE: FOLLOWER
+      SHARD_PARTITIONS: "${SHARD1_PARTITIONS:-0,1,2,3,4,5,6,7,8,9}"
+      SHARD_TOTAL_PARTITIONS: "${TOTAL_PARTITIONS:-30}"
+    volumes:
+      - shard1a-data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9081/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  shard1b:
+    profiles: ["followers"]
+    build:
+      context: .
+      args:
+        BINARY: shard
+    ports:
+      - "9082:9082"
+    environment:
+      SHARD_ID: shard1b
+      SHARD_ADDR: ":9082"
+      SHARD_WAL_PATH: /app/data/shard.wal
+      SHARD_STORE_PATH: /app/data/shard_state.json
+      SHARD_ROLE: FOLLOWER
+      SHARD_PARTITIONS: "${SHARD1_PARTITIONS:-0,1,2,3,4,5,6,7,8,9}"
+      SHARD_TOTAL_PARTITIONS: "${TOTAL_PARTITIONS:-30}"
+    volumes:
+      - shard1b-data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9082/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # ---- Shard 2 Followers ----
+  shard2a:
+    profiles: ["followers-s2"]
+    build:
+      context: .
+      args:
+        BINARY: shard
+    ports:
+      - "9083:9083"
+    environment:
+      SHARD_ID: shard2a
+      SHARD_ADDR: ":9083"
+      SHARD_WAL_PATH: /app/data/shard.wal
+      SHARD_STORE_PATH: /app/data/shard_state.json
+      SHARD_ROLE: FOLLOWER
+      SHARD_PARTITIONS: "${SHARD2_PARTITIONS:-10,11,12,13,14,15,16,17,18,19}"
+      SHARD_TOTAL_PARTITIONS: "${TOTAL_PARTITIONS:-30}"
+    volumes:
+      - shard2a-data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9083/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  shard2b:
+    profiles: ["followers-s2"]
+    build:
+      context: .
+      args:
+        BINARY: shard
+    ports:
+      - "9084:9084"
+    environment:
+      SHARD_ID: shard2b
+      SHARD_ADDR: ":9084"
+      SHARD_WAL_PATH: /app/data/shard.wal
+      SHARD_STORE_PATH: /app/data/shard_state.json
+      SHARD_ROLE: FOLLOWER
+      SHARD_PARTITIONS: "${SHARD2_PARTITIONS:-10,11,12,13,14,15,16,17,18,19}"
+      SHARD_TOTAL_PARTITIONS: "${TOTAL_PARTITIONS:-30}"
+    volumes:
+      - shard2b-data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9084/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # ---- Shard 3 Followers ----
+  shard3a:
+    profiles: ["followers-s3"]
+    build:
+      context: .
+      args:
+        BINARY: shard
+    ports:
+      - "9085:9085"
+    environment:
+      SHARD_ID: shard3a
+      SHARD_ADDR: ":9085"
+      SHARD_WAL_PATH: /app/data/shard.wal
+      SHARD_STORE_PATH: /app/data/shard_state.json
+      SHARD_ROLE: FOLLOWER
+      SHARD_PARTITIONS: "${SHARD3_PARTITIONS:-20,21,22,23,24,25,26,27,28,29}"
+      SHARD_TOTAL_PARTITIONS: "${TOTAL_PARTITIONS:-30}"
+    volumes:
+      - shard3a-data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9085/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  shard3b:
+    profiles: ["followers-s3"]
+    build:
+      context: .
+      args:
+        BINARY: shard
+    ports:
+      - "9086:9086"
+    environment:
+      SHARD_ID: shard3b
+      SHARD_ADDR: ":9086"
+      SHARD_WAL_PATH: /app/data/shard.wal
+      SHARD_STORE_PATH: /app/data/shard_state.json
+      SHARD_ROLE: FOLLOWER
+      SHARD_PARTITIONS: "${SHARD3_PARTITIONS:-20,21,22,23,24,25,26,27,28,29}"
+      SHARD_TOTAL_PARTITIONS: "${TOTAL_PARTITIONS:-30}"
+    volumes:
+      - shard3b-data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9086/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # ---- Load Monitor ----
+  load-monitor:
+    build:
+      context: .
+      args:
+        BINARY: load-monitor
+    ports:
+      - "8090:8090"
+    environment:
+      MONITOR_ADDR: ":8090"
+      SHARD_MAP_PATH: /app/config/shard_map.json
+      POLL_INTERVAL: "5s"
+      HOTSPOT_THRESHOLD: "${HOTSPOT_REQUESTS:-500}"
+    volumes:
+      - ./config:/app/config:ro
+    depends_on:
+      shard1:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8090/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  shard1-data:
+  shard1a-data:
+  shard1b-data:
+  shard2-data:
+  shard2a-data:
+  shard2b-data:
+  shard3-data:
+  shard3a-data:
+  shard3b-data:
