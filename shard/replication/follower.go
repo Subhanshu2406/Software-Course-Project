@@ -59,7 +59,6 @@ func (f *FollowerReceiver) LastLogID() uint64 {
 // RegisterHTTPHandlers adds replication endpoints to a ServeMux.
 func (f *FollowerReceiver) RegisterHTTPHandlers(mux *http.ServeMux) {
 	mux.HandleFunc("/replicate", f.handleReplicate)
-	mux.HandleFunc("/log-index", f.handleLogIndex)
 }
 
 // --- HTTP handlers ---
