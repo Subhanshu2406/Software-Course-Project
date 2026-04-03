@@ -69,6 +69,10 @@ func main() {
 		httpConsumer = consumer.NewHTTPConsumer(addr, txnRouter)
 		mux.HandleFunc("/submit", httpConsumer.HandleSubmitDirect)
 		mux.HandleFunc("/status", httpConsumer.HandleStatusDirect)
+		mux.HandleFunc("/transfer", httpConsumer.HandleTransferDirect)
+		mux.HandleFunc("/transactions", httpConsumer.HandleTransactionsDirect)
+		mux.HandleFunc("/metrics", httpConsumer.HandleMetricsDirect)
+		mux.HandleFunc("/metrics/prometheus", httpConsumer.HandlePrometheusMetrics)
 
 		log.Printf("Coordinator: Kafka consumer (%s, topic=%s) + HTTP on %s", kafkaBrokers, kafkaTopic, addr)
 	} else {
@@ -76,6 +80,10 @@ func main() {
 		httpConsumer = consumer.NewHTTPConsumer(addr, txnRouter)
 		mux.HandleFunc("/submit", httpConsumer.HandleSubmitDirect)
 		mux.HandleFunc("/status", httpConsumer.HandleStatusDirect)
+		mux.HandleFunc("/transfer", httpConsumer.HandleTransferDirect)
+		mux.HandleFunc("/transactions", httpConsumer.HandleTransactionsDirect)
+		mux.HandleFunc("/metrics", httpConsumer.HandleMetricsDirect)
+		mux.HandleFunc("/metrics/prometheus", httpConsumer.HandlePrometheusMetrics)
 
 		log.Printf("Coordinator: HTTP consumer on %s", addr)
 	}
