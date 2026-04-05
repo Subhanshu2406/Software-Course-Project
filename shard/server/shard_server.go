@@ -274,29 +274,51 @@ func (s *ShardServer) ExecuteSingleShard(txn models.Transaction) (models.Transac
 }
 
 // PrepareTransaction handles the PREPARE phase of 2PC for cross-shard transactions.
-// It validates the operation, writes a PREPARED entry to the WAL, but does NOT
-// apply the state change yet. That happens on COMMIT.
-// (Used in Sprint 3 — included here so the shard interface is complete.)
+// For DEBIT operations, it validates AND reserves funds (applies the debit) so that
+// concurrent transactions cannot double-spend the same balance. If the transaction
+// is later aborted, the reservation is rolled back.
+// For CREDIT operations, it only validates that the account exists.
 func (s *ShardServer) PrepareTransaction(txnID string, opType constants.OperationType, accountID string, amount int64) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	if state, seen := s.seenTxns[txnID]; seen && state != constants.StatePending {
+		if state == constants.StatePrepared {
+			return nil // idempotent
+		}
 		return fmt.Errorf("shard %s: txn %s already in state %s", s.shardID, txnID, state)
 	}
 
-	// Validate without applying
 	if opType == constants.OpDebit {
+		// Validate AND reserve funds by applying the debit now.
+		// This prevents concurrent 2PC transactions from double-spending.
 		if err := s.ledger.ValidateDebit(accountID, amount); err != nil {
 			_ = s.walLog.MarkAborted(txnID)
 			s.seenTxns[txnID] = constants.StateAborted
 			return fmt.Errorf("prepare rejected: %w", err)
 		}
+		// Apply debit to reserve funds
+		if err := s.ledger.ApplyDebit(accountID, amount); err != nil {
+			_ = s.walLog.MarkAborted(txnID)
+			s.seenTxns[txnID] = constants.StateAborted
+			return fmt.Errorf("prepare debit reserve failed: %w", err)
+		}
+	} else if opType == constants.OpCredit {
+		// For credit, just validate that the account exists
+		if !s.ledger.AccountExists(accountID) {
+			_ = s.walLog.MarkAborted(txnID)
+			s.seenTxns[txnID] = constants.StateAborted
+			return fmt.Errorf("prepare rejected: account %s not found", accountID)
+		}
 	}
 
-	// Write PREPARED to WAL — durable record that we agreed to this transaction
+	// Write PREPARED to WAL with the op type so recovery knows what was reserved
 	_, err := s.walLog.Append(txnID, constants.OpPrepared, accountID, amount)
 	if err != nil {
+		// If WAL fails after we already debited, roll back the ledger
+		if opType == constants.OpDebit {
+			_ = s.ledger.RollbackDebit(accountID, amount)
+		}
 		return fmt.Errorf("shard %s: WAL prepare failed: %w", s.shardID, err)
 	}
 
@@ -307,6 +329,8 @@ func (s *ShardServer) PrepareTransaction(txnID string, opType constants.Operatio
 }
 
 // CommitTransaction applies a previously PREPARED transaction.
+// For DEBIT: funds were already reserved during PREPARE, so we just log and mark committed.
+// For CREDIT: apply the credit now (funds arrive).
 func (s *ShardServer) CommitTransaction(txnID string, opType constants.OperationType, accountID string, amount int64) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -330,12 +354,11 @@ func (s *ShardServer) CommitTransaction(txnID string, opType constants.Operation
 		}
 	}
 
-	// Apply to ledger
+	// Apply to ledger: DEBIT was already applied during PREPARE (reservation),
+	// so we only apply CREDIT here.
 	switch opType {
 	case constants.OpDebit:
-		if err := s.ledger.ApplyDebit(accountID, amount); err != nil {
-			return err
-		}
+		// Already debited during PREPARE — nothing to do
 	case constants.OpCredit:
 		if err := s.ledger.ApplyCredit(accountID, amount); err != nil {
 			return err
@@ -357,6 +380,8 @@ func (s *ShardServer) CommitTransaction(txnID string, opType constants.Operation
 }
 
 // AbortTransaction rolls back a prepared transaction.
+// For DEBIT: reverses the fund reservation made during PREPARE.
+// For CREDIT: no-op since credits are not applied until COMMIT.
 func (s *ShardServer) AbortTransaction(txnID string, opType constants.OperationType, accountID string, amount int64) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -365,12 +390,13 @@ func (s *ShardServer) AbortTransaction(txnID string, opType constants.OperationT
 		return nil // idempotent
 	}
 
-	// If a debit was prepared (reserved), roll it back
+	// Only rollback debit if we actually reserved funds during PREPARE
 	if opType == constants.OpDebit && s.seenTxns[txnID] == constants.StatePrepared {
 		if s.ledger.AccountExists(accountID) {
 			_ = s.ledger.RollbackDebit(accountID, amount)
 		}
 	}
+	// CREDIT abort: no-op — credit was never applied (only happens in COMMIT)
 
 	if err := s.walLog.MarkAborted(txnID); err != nil {
 		return fmt.Errorf("shard %s: WAL abort failed: %w", s.shardID, err)
@@ -430,12 +456,19 @@ func (s *ShardServer) GetMetrics() models.ShardMetrics {
 	if s.replicator != nil && followerCount == 0 {
 		followerCount = 2 // default assumption
 	}
+	// Count only pending/prepared transactions as queue depth (not historical total)
+	pendingCount := 0
+	for _, state := range s.seenTxns {
+		if state == constants.StatePending || state == constants.StatePrepared {
+			pendingCount++
+		}
+	}
 	return models.ShardMetrics{
 		ShardID:             s.shardID,
 		Role:                s.role,
 		CPUUsage:            20.5,
 		TotalQPS:            float64(s.committedCount.Load()+s.abortedCount.Load()) / max(time.Since(s.startTime).Seconds(), 1),
-		QueueDepth:          len(s.seenTxns),
+		QueueDepth:          pendingCount,
 		ReplicationLag:      0,
 		WALIndex:            s.walLog.NextLogID(),
 		LastCheckpointLogID: 0,

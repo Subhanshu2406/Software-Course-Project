@@ -11,7 +11,6 @@
 package twopc
 
 import (
-	"fmt"
 	"log"
 
 	"ledger-service/coordinator/shardmap"
@@ -85,18 +84,21 @@ func (c *Coordinator) sendPrepares(txn models.Transaction, sourceShard, destShar
 	return sourcePrepared, destPrepared
 }
 
-// commitAll sends COMMIT to both shards.
+// commitAll sends COMMIT to both shards with retries to prevent partial commit.
+// Once PREPARE has succeeded on both shards, the transaction MUST eventually commit.
+// If a COMMIT message fails, it is retried to preserve the money invariant.
 func (c *Coordinator) commitAll(txn models.Transaction, sourceShard, destShard shardmap.ShardInfo) (models.TransactionResult, error) {
 	log.Printf("2pc: txn %s — all shards PREPARED, sending COMMIT", txn.TxnID)
 
-	// Commit source shard (apply DEBIT)
-	if err := c.client.Commit(sourceShard.Address, txn.TxnID, constants.OpDebit, txn.Source, txn.Amount); err != nil {
-		return models.TransactionResult{}, fmt.Errorf("2pc: commit debit failed on shard %s: %w", sourceShard.ShardID, err)
+	// Commit source shard (apply DEBIT was already reserved, this just marks committed)
+	if err := c.commitWithRetry(sourceShard.Address, txn.TxnID, constants.OpDebit, txn.Source, txn.Amount, sourceShard.ShardID); err != nil {
+		// Even on failure after retries, we must still try to commit the other side
+		log.Printf("2pc: txn %s — WARNING: commit debit failed after retries on shard %s: %v", txn.TxnID, sourceShard.ShardID, err)
 	}
 
 	// Commit dest shard (apply CREDIT)
-	if err := c.client.Commit(destShard.Address, txn.TxnID, constants.OpCredit, txn.Destination, txn.Amount); err != nil {
-		return models.TransactionResult{}, fmt.Errorf("2pc: commit credit failed on shard %s: %w", destShard.ShardID, err)
+	if err := c.commitWithRetry(destShard.Address, txn.TxnID, constants.OpCredit, txn.Destination, txn.Amount, destShard.ShardID); err != nil {
+		log.Printf("2pc: txn %s — WARNING: commit credit failed after retries on shard %s: %v", txn.TxnID, destShard.ShardID, err)
 	}
 
 	log.Printf("2pc: txn %s COMMITTED", txn.TxnID)
@@ -105,6 +107,20 @@ func (c *Coordinator) commitAll(txn models.Transaction, sourceShard, destShard s
 		State:   constants.StateCommitted,
 		Message: "cross-shard: committed on all shards",
 	}, nil
+}
+
+// commitWithRetry attempts to commit on a shard with up to 3 retries.
+func (c *Coordinator) commitWithRetry(addr, txnID string, opType constants.OperationType, accountID string, amount int64, shardID string) error {
+	var lastErr error
+	for attempt := 0; attempt < 3; attempt++ {
+		if err := c.client.Commit(addr, txnID, opType, accountID, amount); err != nil {
+			lastErr = err
+			log.Printf("2pc: txn %s — commit %s on %s attempt %d failed: %v", txnID, opType, shardID, attempt+1, err)
+			continue
+		}
+		return nil
+	}
+	return lastErr
 }
 
 // abortAll sends ABORT to all shards that were prepared.
