@@ -83,29 +83,39 @@ func (m *LoadMonitor) checkHotspots() {
 	var hotShard *shardmap.ShardInfo
 	var coolShard *shardmap.ShardInfo
 	
-	// Extremely naive "find the hottest and coolest shard"
-	maxDepth := -1
-	minDepth := 999999999
+	// Use committed_count (total throughput) to detect imbalanced shards
+	maxLoad := int64(-1)
+	minLoad := int64(999999999)
 
 	for _, shard := range m.shardMap.AllShards() {
 		metrics, ok := m.metrics[shard.ShardID]
 		if !ok {
 			continue
 		}
-		if metrics.QueueDepth > maxDepth {
-			maxDepth = metrics.QueueDepth
+		load := metrics.CommittedCount
+		if load > maxLoad {
+			maxLoad = load
 			sh := shard
 			hotShard = &sh
 		}
-		if metrics.QueueDepth < minDepth {
-			minDepth = metrics.QueueDepth
+		if load < minLoad {
+			minLoad = load
 			sh := shard
 			coolShard = &sh
 		}
 	}
 
-	if hotShard != nil && coolShard != nil && maxDepth > m.thresholdDepth && hotShard.ShardID != coolShard.ShardID {
-		log.Printf("monitor: detected hotspot %s (depth %d), migrating to %s", hotShard.ShardID, maxDepth, coolShard.ShardID)
+	// Only migrate if the hot shard has significantly more throughput than the cool shard
+	// and has processed at least the threshold number of transactions
+	if hotShard != nil && coolShard != nil && maxLoad > int64(m.thresholdDepth) && (maxLoad - minLoad) > int64(m.thresholdDepth)/2 && hotShard.ShardID != coolShard.ShardID {
+		// Don't migrate if we've already migrated recently (cooldown)
+		if len(m.migrations) > 0 {
+			lastMigration := m.migrations[len(m.migrations)-1]
+			if time.Since(lastMigration.CompletedAt) < 30*time.Second {
+				return
+			}
+		}
+		log.Printf("monitor: detected hotspot %s (load %d vs %d), migrating to %s", hotShard.ShardID, maxLoad, minLoad, coolShard.ShardID)
 		go m.migratePartition(*hotShard, *coolShard)
 	}
 }
@@ -121,11 +131,11 @@ func (m *LoadMonitor) migratePartition(hot shardmap.ShardInfo, cool shardmap.Sha
 	}
 	partID := partitions[0]
 
-	// Get trigger queue depth
+	// Get trigger load
 	m.mu.Lock()
 	triggerDepth := 0
 	if metrics, ok := m.metrics[hot.ShardID]; ok {
-		triggerDepth = metrics.QueueDepth
+		triggerDepth = int(metrics.CommittedCount)
 	}
 	m.mu.Unlock()
 
