@@ -12,6 +12,7 @@ export
         test-concurrency test-recovery test-follower-kill test-leader-failover \
         test-coordinator-kill test-multi-coordinator test-migration test-scale \
         test-invariant test-all test-fast report clean \
+        test-failure test-cross-shard test-stress \
         frontend-dev frontend-build open open-grafana open-prometheus token-set
 
 # ---- Build ----
@@ -193,6 +194,21 @@ test-scale:
 test-invariant:
 	@echo ""; echo "=== T13: Final Invariant ==="
 	bash tests/check_invariant.sh
+
+# T14 — Failure tests (alias)
+test-failure:
+	@echo ""; echo "=== T14: Failure Tests (alias for test-follower-kill) ==="
+	bash tests/failure_tests.sh
+
+# T15 — Cross-shard load test (alias)
+test-cross-shard:
+	@echo ""; echo "=== T15: Cross-Shard Load ==="
+	$(call run_k6,cross_shard,results_cross.json)
+
+# T16 — Comprehensive stress test (invariant + WAL + migration + faults under load)
+test-stress:
+	@echo ""; echo "=== T16: Comprehensive Stress Test ==="
+	bash tests/stress_test.sh
 
 # ---- Composite targets ----
 test-all: test-health test-load-single test-load-cross test-load-mixed \
