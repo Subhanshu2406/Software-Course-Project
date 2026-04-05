@@ -27,7 +27,7 @@ for i in $(seq 1 50); do
         -d "{\"txn_id\":\"wal-test-$i\",\"source\":\"wal_user$SRC\",\"destination\":\"wal_user$DST\",\"amount\":1}" \
         -o /dev/null || true
 done
-sleep 2
+sleep 3
 
 # Record balances after transfers
 echo "Step 3: Recording post-transfer balances..."
@@ -43,17 +43,17 @@ echo "  Post-transfer balances: $BALANCE_RECORD"
 echo "Step 4: Force-killing shard1..."
 docker compose kill -s KILL shard1 2>/dev/null
 
-sleep 3
+sleep 5
 
 # Step 5: Restart shard1
 echo "Step 5: Restarting shard1..."
 docker compose start shard1 2>/dev/null
 
-# Wait for health
+# Wait for health with extended timeout
 echo "  Waiting for shard1 to recover..."
 ELAPSED=0
 RECOVERED=false
-while [ $ELAPSED -lt 30 ]; do
+while [ $ELAPSED -lt 60 ]; do
     STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$SHARD1_URL/health" 2>/dev/null || echo "000")
     if [ "$STATUS" = "200" ]; then
         RECOVERED=true

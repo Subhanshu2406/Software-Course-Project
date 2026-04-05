@@ -58,11 +58,11 @@ if [ "$SUM_ONLY" = true ]; then
     exit 0
 fi
 
-# Expected: __bank__ initial per shard = NUM_ACCOUNTS * STARTING_BALANCE
-# Total bank initial = 3 * NUM_ACCOUNTS * STARTING_BALANCE
-# After seeding all users: user balances = NUM_ACCOUNTS * STARTING_BALANCE
-# Bank remaining = 3 * (N*SB) - N*SB = 2 * N * SB
-# Grand total = user + bank = N*SB + 2*N*SB = 3*N*SB
+# Expected total: __bank__ starts with BANK_BALANCE on each of 3 shards = 3 * N * SB.
+# After seeding, user balances = N * SB, bank remaining = 3*N*SB - N*SB = 2*N*SB.
+# Grand total = user (N*SB) + bank (2*N*SB) = 3 * N * SB.
+# All transfers are zero-sum within the system. The invariant holds if:
+#   grand_total == 3 * NUM_ACCOUNTS * STARTING_BALANCE
 EXPECTED=$((NUM_ACCOUNTS * STARTING_BALANCE * 3))
 
 echo ""

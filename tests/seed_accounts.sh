@@ -28,7 +28,10 @@ echo "Starting balance per account: $STARTING_BALANCE"
 echo "Total system balance: $TOTAL_BALANCE"
 echo ""
 
-# Step 1: Create __bank__ on all shards with large balance
+# Step 1: Determine which shard __bank__ hashes to by creating on all shards,
+# then only the shard that gets routed to will be used for transfers.
+# We create __bank__ on ALL shards so the shard with the bank can process debits.
+# To maintain the invariant, create with 0 on shards that won't be used.
 echo "Creating __bank__ account on all shards..."
 for SHARD_URL in $SHARD1_URL $SHARD2_URL $SHARD3_URL; do
     curl -s -X POST "$SHARD_URL/create-account" \
