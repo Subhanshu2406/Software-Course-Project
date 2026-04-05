@@ -32,7 +32,7 @@ func envOrDefault(key, fallback string) string {
 }
 
 func main() {
-	addr := envOrDefault("FAULT_PROXY_ADDR", ":8099")
+	addr := envOrDefault("FAULT_PROXY_ADDR", ":6060")
 
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
@@ -95,6 +95,31 @@ func main() {
 
 	mux.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) {
 		name := r.URL.Query().Get("container")
+		if name == "" {
+			// Return status of all allowed containers
+			statuses := make(map[string]map[string]string)
+			for containerName := range allowedContainers {
+				containerID, err := findContainer(cli, containerName)
+				if err != nil {
+					statuses[containerName] = map[string]string{"status": "not_found", "running": "false"}
+					continue
+				}
+				info, err := cli.ContainerInspect(context.Background(), containerID)
+				if err != nil {
+					statuses[containerName] = map[string]string{"status": "error", "running": "false"}
+					continue
+				}
+				running := "false"
+				state := "stopped"
+				if info.State.Running {
+					running = "true"
+					state = "running"
+				}
+				statuses[containerName] = map[string]string{"status": state, "running": running}
+			}
+			jsonOK(w, statuses)
+			return
+		}
 		if !allowedContainers[name] {
 			httpErr(w, http.StatusForbidden, "container not in allowlist")
 			return
@@ -113,7 +138,7 @@ func main() {
 		if info.State.Running {
 			state = "running"
 		}
-		jsonOK(w, map[string]string{"status": state, "container": name})
+		jsonOK(w, map[string]string{"status": state, "container": name, "running": fmt.Sprintf("%t", info.State.Running)})
 	})
 
 	log.Printf("fault-proxy listening on %s", addr)
