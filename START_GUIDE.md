@@ -152,30 +152,116 @@ curl http://localhost:8080/status?txn_id=test-001
 
 ## 7. Run Tests
 
+### Quick Test Suite
 ```bash
-# All integration tests
+# Build and run all tests (includes unit + integration)
 make test-all
 
-# Individual tests
-make test-cross-shard   # Money conservation across shards
-make test-invariant     # Balance invariant check
-make test-failure       # Kill leader/follower/coordinator tests
-make test-recovery      # WAL crash recovery
-make test-migration     # Hotspot detection & partition migration
+# Fast smoke test only
+make test-fast
+```
 
-# Unit tests (no Docker required)
+### Individual Test Targets
+
+**Money Invariant & Transaction Tests:**
+```bash
+make test-cross-shard    # Cross-shard transfers + balance conservation
+make test-invariant      # Verify total money in system is conserved
+make test-failure        # Kill leader/follower/coordinator scenarios
+make test-recovery       # WAL crash recovery (kill + restart shard)
+make test-migration      # Hotspot detection & partition rebalancing
+```
+
+**Comprehensive Stress Testing:**
+```bash
+make test-stress         # 6-phase stress test (300+ concurrent txns)
+```
+
+This validates:
+- High transaction throughput (single + cross-shard under sustained load)
+- Write-Ahead Logging (WAL) durability and crash recovery
+- Partition migration during active transactions
+- Fault tolerance (shard kill/restart mid-flight)
+- Money invariant conservation throughout all failures
+- System recovery after coordinator kills
+
+**Load Testing:**
+```bash
+make test-load           # K6 + Grafana load test (requires k6 image)
+make test-load-single    # Single-shard only
+make test-load-cross     # Cross-shard only
+make test-load-mixed     # Mixed workload
+```
+
+**Unit Tests (no Docker):**
+```bash
 make unit-test
-
-# Load test (requires k6 Docker image)
-make test-load
 ```
 
 ---
 
-## 8. Monitor the System
+## 8. Recent Fixes & Improvements (Latest Release)
+
+### Money Invariant Fixes (2PC Protocol)
+
+The Two-Phase Commit coordinator now correctly implements reservation-based accounting:
+
+- **PREPARE Phase**: Debits are now **reserved** (applied immediately) on the source shard, preventing double-spending and overdrafts
+- **COMMIT Phase**: Only credits are applied (debits already done in PREPARE)
+- **ABORT Phase**: Only committed debits are rolled back, preventing spurious money creation
+- **Coordinator Retry**: Commit operations now retry 3x per shard to prevent partial commits
+
+**Impact**: Cross-shard transfers now correctly conserve money under any failure scenario.
+
+### Fault Injection Improvements
+
+- Fault proxy now correctly listens on port **6060** (matched with docker-compose and Nginx)
+- `/status` endpoint returns status of **all containers** (not just one)
+- Frontend can now reliably poll container status and inject failures
+
+**Impact**: Frontend Fault Injection page now works without Nginx 502 errors.
+
+### Load Monitor Enhancements
+
+- **Hotspot Detection**: Now uses **CommittedCount** (actual throughput) instead of broken `QueueDepth` metric
+- **Migration Cooldown**: 30-second cooldown prevents runaway migrations when a shard is legitimately busy
+- **Better Tuning**: Partition rebalancing is more selective, reducing unnecessary churn
+
+**Impact**: Ledger sustains higher load without constant partition migrations.
+
+### WAL Recovery Improvements
+
+- Recovery timeout increased (30s → 60s) for nodes with large WAL logs
+- Better sleep timing between transaction batches
+- Integration tests for crash recovery now pass reliably
+
+**Impact**: System reliably recovers from shard crashes without data loss.
+
+### Frontend State Synchronization
+
+- FaultInjection page correctly parses container status with new `running` field
+- Polling interval optimized (5s → 3s) for faster UI updates
+- Better handling of state during container restarts
+
+**Impact**: Frontend dashboard remains responsive and accurate during failures.
+
+### New Comprehensive Stress Test
+
+A new 6-phase stress test (`make test-stress`) validates the entire system under load:
+
+1. **Sustained Single-Shard Load**: 200 concurrent transfers
+2. **Cross-Shard Transactions**: 100 concurrent cross-shard transfers
+3. **WAL Crash Recovery**: Kill a shard mid-flight, verify WAL recovery
+4. **Coordinator Restart**: Stop/restart coordinator during active loads
+5. **Partition Migration**: Trigger hotspot detection and migration under load
+6. **Final Invariant Check**: Verify money conservation through all failures
+
+---
+
+## 9. Monitor the System
 
 ```bash
-# Load Monitor metrics
+# Load Monitor 
 curl http://localhost:8090/metrics
 
 # Health checks
@@ -259,7 +345,7 @@ localStorage.setItem('ledger_token', '<token>')
 
 ---
 
-## 9. Troubleshooting
+## 10. Troubleshooting
 
 | Symptom | Fix |
 |---------|-----|
@@ -270,10 +356,41 @@ localStorage.setItem('ledger_token', '<token>')
 | Port conflict | Change port mappings in `docker-compose.yml` |
 | Windows: grep not found | Use `make.bat` (Windows wrapper) instead of `make` |
 | Windows: bash not found | Make sure Docker Compose CLI is installed and works with `docker compose ps` |
+| Fault injector returns 502 | Ensure fault-proxy is running on port 6060: `docker compose logs fault-proxy` |
+| Money invariant fails | Run `make test-recovery` to check WAL; verify no nodes crashed unexpectedly |
+| Stress test fails | Check shard logs: `docker compose logs shard1 shard2 shard3 coordinator` |
+| High migration churn | Load monitor should auto-tune; if excessive, check `load-monitor/monitor.go` hotspot threshold |
 
 ---
 
-## 10. Stop & Clean Up
+## 11. Build Without Docker (Local Go Build)
+
+To compile Go code locally without Docker:
+
+**Unix/Mac:**
+```bash
+# Build all Go packages (no Docker required)
+go build ./...
+
+# Run specific component
+go run cmd/shard/main.go
+go run cmd/coordinator/main.go
+```
+
+**Windows (PowerShell):**
+```powershell
+# Build all Go packages
+go build .\...
+
+# Or use the Makefile (preferred, handles dependencies)
+make.bat build
+```
+
+**Note:** Local builds require Go 1.24+, no Docker, and no Docker Compose. For full system testing, use `make up` (which uses Docker).
+
+---
+
+## 12. Stop & Clean Up
 
 **Unix/Mac:**
 ```bash
