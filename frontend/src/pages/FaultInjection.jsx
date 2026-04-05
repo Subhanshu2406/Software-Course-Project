@@ -6,8 +6,8 @@ export default function FaultInjection() {
   const [log, setLog] = useState([])
   const [acting, setActing] = useState(null)
 
-  const statusFetcher = useCallback(() => api.faultStatus().catch(() => null), [])
-  const { data: status, refresh } = usePolling(statusFetcher, 5000)
+  const statusFetcher = useCallback(() => api.faultStatus().catch(() => ({})), [])
+  const { data: status, refresh } = usePolling(statusFetcher, 3000)
 
   const addLog = (msg, type = 'info') => {
     setLog((prev) => [{ msg, type, ts: new Date().toISOString() }, ...prev].slice(0, 50))
@@ -44,7 +44,8 @@ export default function FaultInjection() {
   const getContainerStatus = (name) => {
     if (!status) return 'unknown'
     const c = status[name]
-    return c?.running ? 'running' : 'stopped'
+    if (!c) return 'unknown'
+    return c.running === 'true' || c.status === 'running' ? 'running' : 'stopped'
   }
 
   return (
