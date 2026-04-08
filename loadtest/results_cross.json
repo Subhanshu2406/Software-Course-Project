@@ -1,0 +1,15 @@
+{
+  "scenario": "cross_shard",
+  "single_shard": {
+    "p95": 0,
+    "avg": 0
+  },
+  "cross_shard": {
+    "p95": 741.5282530000001,
+    "avg": 250.13208902466187
+  },
+  "total_requests": 11556,
+  "tps": 190.47412147306216,
+  "error_rate": 0,
+  "overall_p95": 741.5282530000001
+}

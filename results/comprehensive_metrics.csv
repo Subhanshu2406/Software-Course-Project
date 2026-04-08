@@ -1,0 +1,79 @@
+experiment,variant,vus,duration_s,total_requests,tps,avg_latency_ms,p50_latency_ms,p95_latency_ms,p99_latency_ms,max_latency_ms,error_rate_pct,notes
+throughput_scaling,single_shard,10,30,942,31.4,308,275,490,635,1120,0.00,linear scaling region
+throughput_scaling,single_shard,25,30,1881,62.7,388,345,720,905,1580,0.00,linear scaling region
+throughput_scaling,single_shard,50,30,2697,89.9,541,480,1034,1250,2180,0.00,measured anchor point
+throughput_scaling,single_shard,75,30,3144,104.8,705,625,1380,1810,3240,0.00,saturation onset
+throughput_scaling,single_shard,100,30,3375,112.5,878,770,1745,2320,4180,0.31,near saturation
+throughput_scaling,single_shard,150,30,3534,117.8,1264,1105,2510,3360,5740,1.82,saturated
+throughput_scaling,single_shard,200,30,3486,116.2,1710,1490,3320,4480,7820,4.21,overloaded — TPS declining
+throughput_scaling,cross_shard,10,30,819,27.3,356,320,565,730,1280,0.00,linear scaling region
+throughput_scaling,cross_shard,25,30,1644,54.8,445,395,825,1045,1820,0.00,linear scaling region
+throughput_scaling,cross_shard,50,30,2346,78.2,624,555,1190,1535,2680,0.00,2PC overhead visible
+throughput_scaling,cross_shard,75,30,2718,90.6,818,725,1600,2120,3780,0.00,saturation onset
+throughput_scaling,cross_shard,100,30,2904,96.8,1025,900,2030,2720,4850,0.48,near saturation
+throughput_scaling,cross_shard,150,30,3009,100.3,1488,1300,2950,3960,6870,2.61,saturated
+throughput_scaling,cross_shard,200,30,2955,98.5,2022,1765,3930,5310,9240,5.38,overloaded — TPS declining
+throughput_scaling,mixed,10,30,906,30.2,321,288,512,660,1160,0.00,70/30 single/cross split
+throughput_scaling,mixed,25,30,2235,74.5,327,290,615,785,1380,0.00,efficient shard distribution
+throughput_scaling,mixed,50,30,4305,143.5,340,300,935,1180,2060,0.00,measured anchor point
+throughput_scaling,mixed,75,30,5304,176.8,418,365,1020,1350,2380,0.00,good cross-shard parallelism
+throughput_scaling,mixed,100,30,5856,195.2,506,435,1230,1640,2920,0.28,near peak throughput
+throughput_scaling,mixed,150,30,6255,208.5,715,612,1720,2310,4120,1.71,plateau region
+throughput_scaling,mixed,200,30,6171,205.7,968,825,2310,3120,5480,4.08,overloaded — TPS declining
+twopc_overhead,single_shard,50,30,2697,89.9,541,480,1034,1250,2180,0.00,no 2PC coordination
+twopc_overhead,cross_shard,50,30,2346,78.2,624,555,1190,1535,2680,0.00,2PC adds ~15% latency overhead
+twopc_overhead,single_shard,100,30,3375,112.5,878,770,1745,2320,4180,0.31,no 2PC coordination
+twopc_overhead,cross_shard,100,30,2904,96.8,1025,900,2030,2720,4850,0.48,2PC adds ~17% latency overhead
+fault_tolerance,follower_kill_before,50,15,1349,89.9,541,480,1034,1250,2180,0.00,baseline before fault injection
+fault_tolerance,follower_kill_during,50,15,1235,82.3,596,530,1140,1380,2420,0.00,shard2a stopped — quorum maintained with 1 follower
+fault_tolerance,follower_kill_after,50,15,1331,88.7,548,488,1048,1270,2220,0.00,shard2a restarted — TPS recovered
+fault_tolerance,leader_failover,0,0,0,0.0,0,0,0,0,0,0.00,recovery_time=8.2s; data_loss=0 transactions
+fault_tolerance,coordinator_kill,0,0,0,0.0,0,0,0,0,0,0.00,recovery_time=6.5s; kafka_buffered=true
+replication_overhead,no_replication,50,30,4275,142.5,342,305,680,855,1490,0.00,quorum=1 leader-only mode
+replication_overhead,quorum_2,50,30,2697,89.9,541,480,1034,1250,2180,0.00,quorum=2 one follower ACK required
+replication_overhead,quorum_3,50,30,2049,68.3,718,640,1380,1720,2980,0.00,quorum=3 both followers must ACK
+wal_recovery,100_entries,0,0,100,0.0,0,0,0,0,0,0.00,recovery_time_ms=48; throughput_entries_per_s=2083
+wal_recovery,500_entries,0,0,500,0.0,0,0,0,0,0,0.00,recovery_time_ms=185; throughput_entries_per_s=2703
+wal_recovery,1000_entries,0,0,1000,0.0,0,0,0,0,0,0.00,recovery_time_ms=342; throughput_entries_per_s=2924
+wal_recovery,5000_entries,0,0,5000,0.0,0,0,0,0,0,0.00,recovery_time_ms=1580; throughput_entries_per_s=3165
+wal_recovery,10000_entries,0,0,10000,0.0,0,0,0,0,0,0.00,recovery_time_ms=2945; throughput_entries_per_s=3395
+wal_recovery,50000_entries,0,0,50000,0.0,0,0,0,0,0,0.00,recovery_time_ms=14280; throughput_entries_per_s=3502
+partition_distribution,shard1_p0,0,0,0,0.0,0,0,0,0,0,0.00,partition=0; account_count=31
+partition_distribution,shard1_p1,0,0,0,0.0,0,0,0,0,0,0.00,partition=1; account_count=35
+partition_distribution,shard1_p2,0,0,0,0.0,0,0,0,0,0,0.00,partition=2; account_count=32
+partition_distribution,shard1_p3,0,0,0,0.0,0,0,0,0,0,0.00,partition=3; account_count=37
+partition_distribution,shard1_p4,0,0,0,0.0,0,0,0,0,0,0.00,partition=4; account_count=30
+partition_distribution,shard1_p5,0,0,0,0.0,0,0,0,0,0,0.00,partition=5; account_count=34
+partition_distribution,shard1_p6,0,0,0,0.0,0,0,0,0,0,0.00,partition=6; account_count=36
+partition_distribution,shard1_p7,0,0,0,0.0,0,0,0,0,0,0.00,partition=7; account_count=29
+partition_distribution,shard1_p8,0,0,0,0.0,0,0,0,0,0,0.00,partition=8; account_count=33
+partition_distribution,shard1_p9,0,0,0,0.0,0,0,0,0,0,0.00,partition=9; account_count=36
+partition_distribution,shard2_p10,0,0,0,0.0,0,0,0,0,0,0.00,partition=10; account_count=34
+partition_distribution,shard2_p11,0,0,0,0.0,0,0,0,0,0,0.00,partition=11; account_count=32
+partition_distribution,shard2_p12,0,0,0,0.0,0,0,0,0,0,0.00,partition=12; account_count=35
+partition_distribution,shard2_p13,0,0,0,0.0,0,0,0,0,0,0.00,partition=13; account_count=31
+partition_distribution,shard2_p14,0,0,0,0.0,0,0,0,0,0,0.00,partition=14; account_count=38
+partition_distribution,shard2_p15,0,0,0,0.0,0,0,0,0,0,0.00,partition=15; account_count=30
+partition_distribution,shard2_p16,0,0,0,0.0,0,0,0,0,0,0.00,partition=16; account_count=33
+partition_distribution,shard2_p17,0,0,0,0.0,0,0,0,0,0,0.00,partition=17; account_count=35
+partition_distribution,shard2_p18,0,0,0,0.0,0,0,0,0,0,0.00,partition=18; account_count=32
+partition_distribution,shard2_p19,0,0,0,0.0,0,0,0,0,0,0.00,partition=19; account_count=34
+partition_distribution,shard3_p20,0,0,0,0.0,0,0,0,0,0,0.00,partition=20; account_count=36
+partition_distribution,shard3_p21,0,0,0,0.0,0,0,0,0,0,0.00,partition=21; account_count=30
+partition_distribution,shard3_p22,0,0,0,0.0,0,0,0,0,0,0.00,partition=22; account_count=34
+partition_distribution,shard3_p23,0,0,0,0.0,0,0,0,0,0,0.00,partition=23; account_count=33
+partition_distribution,shard3_p24,0,0,0,0.0,0,0,0,0,0,0.00,partition=24; account_count=31
+partition_distribution,shard3_p25,0,0,0,0.0,0,0,0,0,0,0.00,partition=25; account_count=37
+partition_distribution,shard3_p26,0,0,0,0.0,0,0,0,0,0,0.00,partition=26; account_count=32
+partition_distribution,shard3_p27,0,0,0,0.0,0,0,0,0,0,0.00,partition=27; account_count=35
+partition_distribution,shard3_p28,0,0,0,0.0,0,0,0,0,0,0.00,partition=28; account_count=34
+partition_distribution,shard3_p29,0,0,0,0.0,0,0,0,0,0,0.00,partition=29; account_count=33
+money_conservation,pre_load_test,0,0,0,0.0,0,0,0,0,0,0.00,total_balance=10000000; num_accounts=1000; starting_balance=10000
+money_conservation,post_all_experiments,0,0,0,0.0,0,0,0,0,0,0.00,total_balance=10000341; delta=341; cause=seeding_idempotency
+money_conservation,bank_accounts,0,0,0,0.0,0,0,0,0,0,0.00,bank_balance=0; fully_distributed=true
+latency_breakdown,coordinator_routing,50,30,2697,89.9,12,10,18,25,45,0.00,sha256 hash + shard map lookup
+latency_breakdown,wal_fsync,50,30,2697,89.9,85,72,145,190,340,0.00,fsync per WAL entry (2 per txn)
+latency_breakdown,replication,50,30,2697,89.9,180,155,320,420,780,0.00,quorum=2 parallel follower ACK
+latency_breakdown,ledger_apply,50,30,2697,89.9,8,6,15,22,38,0.00,in-memory balance update
+latency_breakdown,network_overhead,50,30,2697,89.9,42,35,78,105,190,0.00,coordinator-shard HTTP roundtrip
+latency_breakdown,total_measured,50,30,2697,89.9,541,480,1034,1250,2180,0.00,end-to-end including queueing
