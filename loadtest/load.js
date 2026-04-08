@@ -1,6 +1,7 @@
 import http from 'k6/http';
 import { check, sleep, group } from 'k6';
 import { Counter, Trend } from 'k6/metrics';
+import { sha256 } from 'k6/crypto';
 
 const BASE_URL = __ENV.BASE_URL || 'http://localhost:8080';
 const AUTH_TOKEN = __ENV.AUTH_TOKEN || 'dummy-token';
@@ -8,6 +9,8 @@ const NUM_ACCOUNTS = parseInt(__ENV.NUM_ACCOUNTS || '1000');
 const LOAD_VUS = parseInt(__ENV.LOAD_VUS || '50');
 const LOAD_DURATION = __ENV.LOAD_DURATION || '30s';
 const SCENARIO = __ENV.SCENARIO || 'mixed'; // single_shard, cross_shard, or mixed
+const NUM_PARTITIONS = 30;
+const POW32_MOD_N = Math.pow(2, 32) % NUM_PARTITIONS; // = 16
 
 // Custom metrics
 const singleShardTxns = new Counter('single_shard_txns');
@@ -55,25 +58,50 @@ const params = {
   },
 };
 
-// Pick two accounts that hash to the same shard (within same 333-account range)
-// Accounts 0-332 → shard1, 333-665 → shard2, 666-999 → shard3 (approx)
+// Replicate Go's SHA-256 based partition mapping:
+//   partition = binary.BigEndian.Uint64(sha256(accountID)[:8]) % NUM_PARTITIONS
+// Since JS can't handle uint64, we use modular arithmetic:
+//   val = hi * 2^32 + lo  →  val % N = ((hi%N * (2^32%N)) % N + lo%N) % N
+function getPartition(accountID) {
+  const hash = sha256(accountID, 'hex');
+  const hi = parseInt(hash.substring(0, 8), 16);
+  const lo = parseInt(hash.substring(8, 16), 16);
+  return ((hi % NUM_PARTITIONS) * POW32_MOD_N + lo % NUM_PARTITIONS) % NUM_PARTITIONS;
+}
+
+function getShardIdx(partition) {
+  const perShard = NUM_PARTITIONS / 3;
+  return Math.floor(partition / perShard);
+}
+
+// Pre-compute shard assignments for all accounts
+const shardUsers = [[], [], []]; // shard1, shard2, shard3
+for (let i = 0; i < NUM_ACCOUNTS; i++) {
+  const partition = getPartition(`user${i}`);
+  const idx = getShardIdx(partition);
+  shardUsers[idx].push(i);
+}
+
+// Pick two accounts that hash to the same shard (verified via SHA-256 partition mapping)
 function sameShardPair() {
-  const shardSize = Math.floor(NUM_ACCOUNTS / 3);
   const shardIdx = Math.floor(Math.random() * 3);
-  const base = shardIdx * shardSize;
-  const src = base + Math.floor(Math.random() * shardSize);
-  let dst = base + Math.floor(Math.random() * shardSize);
-  if (src === dst) dst = base + ((dst - base + 1) % shardSize);
+  const users = shardUsers[shardIdx];
+  if (users.length < 2) return [0, 1]; // fallback
+  const src = users[Math.floor(Math.random() * users.length)];
+  let dst = users[Math.floor(Math.random() * users.length)];
+  while (dst === src) dst = users[Math.floor(Math.random() * users.length)];
   return [src, dst];
 }
 
 // Pick two accounts that hash to different shards
 function crossShardPair() {
-  const shardSize = Math.floor(NUM_ACCOUNTS / 3);
   const shard1 = Math.floor(Math.random() * 3);
   let shard2 = (shard1 + 1 + Math.floor(Math.random() * 2)) % 3;
-  const src = shard1 * shardSize + Math.floor(Math.random() * shardSize);
-  const dst = shard2 * shardSize + Math.floor(Math.random() * shardSize);
+  const users1 = shardUsers[shard1];
+  const users2 = shardUsers[shard2];
+  if (users1.length === 0 || users2.length === 0) return [0, Math.floor(NUM_ACCOUNTS / 2)];
+  const src = users1[Math.floor(Math.random() * users1.length)];
+  const dst = users2[Math.floor(Math.random() * users2.length)];
   return [src, dst];
 }
 
