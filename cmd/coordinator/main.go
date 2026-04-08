@@ -42,7 +42,7 @@ func main() {
 	}
 
 	mapper := utils.NewPartitionMapper(totalPartitions)
-	client := messaging.NewShardClient(5 * time.Second)
+	client := messaging.NewShardClient(30 * time.Second)
 	txnRouter := router.NewRouter(shardMap, mapper, client)
 
 	ctx, cancel := context.WithCancel(context.Background())
