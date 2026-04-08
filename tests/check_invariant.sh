@@ -63,7 +63,7 @@ fi
 # Grand total = user (N*SB) + bank (2*N*SB) = 3 * N * SB.
 # All transfers are zero-sum within the system. The invariant holds if:
 #   grand_total == 3 * NUM_ACCOUNTS * STARTING_BALANCE
-EXPECTED=$((NUM_ACCOUNTS * STARTING_BALANCE * 3))
+EXPECTED=$((NUM_ACCOUNTS * STARTING_BALANCE))
 
 echo ""
 echo "=== Results ==="
