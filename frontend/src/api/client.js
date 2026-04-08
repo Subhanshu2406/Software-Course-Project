@@ -46,6 +46,7 @@ const api = {
   loadMonitorHealth: () => request('/load-monitor/health'),
   loadMonitorMetrics: () => request('/load-monitor/metrics'),
   loadMonitorMigrations: () => request('/load-monitor/migrations'),
+  loadMonitorShardMap: () => request('/load-monitor/shard-map'),
 
   // Fault Proxy
   faultStatus: () => request('/fault-proxy/status'),

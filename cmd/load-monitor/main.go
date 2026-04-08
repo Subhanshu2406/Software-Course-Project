@@ -52,6 +52,7 @@ func main() {
 	})
 	mux.HandleFunc("/migrations", lm.HandleMigrations)
 	mux.HandleFunc("/metrics/prometheus", lm.HandlePrometheusMetrics)
+	mux.HandleFunc("/shard-map", lm.HandleShardMap)
 
 	log.Printf("Load Monitor listening on %s (poll=%s, threshold=%d)", addr, pollInterval, threshold)
 	if err := http.ListenAndServe(addr, mux); err != nil {

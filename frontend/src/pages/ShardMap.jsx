@@ -1,12 +1,30 @@
 import { useCluster } from '../context/ClusterContext'
+import { useCallback } from 'react'
+import usePolling from '../hooks/usePolling'
+import api from '../api/client'
+
+const SHARD_COLORS = {
+  shard1: { bg: 'bg-primary/70 hover:bg-primary', dot: 'bg-primary/70', label: 'Shard 1' },
+  shard2: { bg: 'bg-emerald-500/70 hover:bg-emerald-500', dot: 'bg-emerald-500/70', label: 'Shard 2' },
+  shard3: { bg: 'bg-amber-500/70 hover:bg-amber-500', dot: 'bg-amber-500/70', label: 'Shard 3' },
+}
 
 export default function ShardMap() {
   const { shards } = useCluster()
   const shardList = Object.entries(shards)
 
+  const mapFetcher = useCallback(() => api.loadMonitorShardMap().catch(() => null), [])
+  const { data: mapData } = usePolling(mapFetcher, 5000)
+
   const partitions = Array.from({ length: 30 }, (_, i) => {
-    const shardId = i < 10 ? 'shard1' : i < 20 ? 'shard2' : 'shard3'
+    const shardId = mapData?.partitions?.[String(i)] || (i < 10 ? 'shard1' : i < 20 ? 'shard2' : 'shard3')
     return { id: i, shardId }
+  })
+
+  // Count partitions per shard
+  const shardPartCounts = {}
+  partitions.forEach((p) => {
+    shardPartCounts[p.shardId] = (shardPartCounts[p.shardId] || 0) + 1
   })
 
   return (
@@ -22,16 +40,12 @@ export default function ShardMap() {
           </div>
           <div className="grid grid-cols-10 gap-1.5">
             {partitions.map((p) => {
-              const color =
-                p.shardId === 'shard1'
-                  ? 'bg-primary/70 hover:bg-primary'
-                  : p.shardId === 'shard2'
-                  ? 'bg-emerald-500/70 hover:bg-emerald-500'
-                  : 'bg-amber-500/70 hover:bg-amber-500'
+              const colorSet = SHARD_COLORS[p.shardId] || SHARD_COLORS.shard1
               return (
                 <div
                   key={p.id}
-                  className={`${color} rounded-lg aspect-square flex flex-col items-center justify-center cursor-pointer transition-all hover:scale-105`}
+                  className={`${colorSet.bg} rounded-lg aspect-square flex flex-col items-center justify-center cursor-pointer transition-all hover:scale-105`}
+                  title={`Partition ${p.id} → ${p.shardId}`}
                 >
                   <span className="text-[10px] font-mono text-on-surface/80">#{String(p.id).padStart(2, '0')}</span>
                 </div>
@@ -39,15 +53,11 @@ export default function ShardMap() {
             })}
           </div>
           <div className="flex gap-4 mt-4 text-xs text-on-surface-variant">
-            <span className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded bg-primary/70" /> Shard 1 (0-9)
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded bg-emerald-500/70" /> Shard 2 (10-19)
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded bg-amber-500/70" /> Shard 3 (20-29)
-            </span>
+            {Object.entries(SHARD_COLORS).map(([id, c]) => (
+              <span key={id} className="flex items-center gap-1.5">
+                <span className={`w-3 h-3 rounded ${c.dot}`} /> {c.label} ({shardPartCounts[id] || 0})
+              </span>
+            ))}
           </div>
         </div>
 

@@ -51,6 +51,9 @@ export default function ClusterOverview() {
   const { data: txnData } = usePolling(txnFetcher, 3000)
   const recentTxns = Array.isArray(txnData) ? txnData : txnData?.transactions || []
 
+  const mapFetcher = useCallback(() => api.loadMonitorShardMap().catch(() => null), [])
+  const { data: mapData } = usePolling(mapFetcher, 5000)
+
   const shardList = Object.entries(shards)
   const totalTps = shardList.reduce((sum, [, s]) => sum + (s.tps || s.total_qps || 0), 0)
   const totalBalance = shardList.reduce((sum, [, s]) => sum + (s.total_balance || 0), 0)
@@ -153,16 +156,20 @@ export default function ClusterOverview() {
           <h2 className="label-sm mb-4">Partition Map</h2>
           <div className="grid grid-cols-10 gap-1">
             {Array.from({ length: 30 }, (_, i) => {
+              const shardId =
+                mapData?.partitions?.[String(i)] ||
+                (i < 10 ? 'shard1' : i < 20 ? 'shard2' : 'shard3')
               const color =
-                i < 10
+                shardId === 'shard1'
                   ? 'bg-primary/60'
-                  : i < 20
+                  : shardId === 'shard2'
                   ? 'bg-emerald-500/60'
                   : 'bg-amber-500/60'
               return (
                 <div
                   key={i}
                   className={`${color} rounded aspect-square flex items-center justify-center text-[10px] font-mono text-on-surface`}
+                  title={`P${i} → ${shardId}`}
                 >
                   {i}
                 </div>

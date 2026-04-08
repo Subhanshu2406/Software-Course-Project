@@ -19,6 +19,7 @@ type LoadMonitor struct {
 	mu             sync.Mutex
 	shardMap       *shardmap.ShardMap
 	metrics        map[string]models.ShardMetrics
+	prevCommitted  map[string]int64 // previous committed counts for rate calculation
 	thresholdDepth int
 	pollInterval   time.Duration
 	migrations     []MigrationEvent
@@ -41,6 +42,7 @@ func NewLoadMonitor(sm *shardmap.ShardMap, threshold int, interval time.Duration
 	return &LoadMonitor{
 		shardMap:       sm,
 		metrics:        make(map[string]models.ShardMetrics),
+		prevCommitted:  make(map[string]int64),
 		thresholdDepth: threshold,
 		pollInterval:   interval,
 	}
@@ -82,32 +84,34 @@ func (m *LoadMonitor) checkHotspots() {
 
 	var hotShard *shardmap.ShardInfo
 	var coolShard *shardmap.ShardInfo
-	
-	// Use committed_count (total throughput) to detect imbalanced shards
-	maxLoad := int64(-1)
-	minLoad := int64(999999999)
+
+	// Use delta between current and previous committed count (rate per poll interval)
+	maxRate := int64(-1)
+	minRate := int64(999999999)
 
 	for _, shard := range m.shardMap.AllShards() {
 		metrics, ok := m.metrics[shard.ShardID]
 		if !ok {
 			continue
 		}
-		load := metrics.CommittedCount
-		if load > maxLoad {
-			maxLoad = load
+		prev := m.prevCommitted[shard.ShardID]
+		rate := metrics.CommittedCount - prev
+		m.prevCommitted[shard.ShardID] = metrics.CommittedCount
+
+		if rate > maxRate {
+			maxRate = rate
 			sh := shard
 			hotShard = &sh
 		}
-		if load < minLoad {
-			minLoad = load
+		if rate < minRate {
+			minRate = rate
 			sh := shard
 			coolShard = &sh
 		}
 	}
 
-	// Only migrate if the hot shard has significantly more throughput than the cool shard
-	// and has processed at least the threshold number of transactions
-	if hotShard != nil && coolShard != nil && maxLoad > int64(m.thresholdDepth) && (maxLoad - minLoad) > int64(m.thresholdDepth)/2 && hotShard.ShardID != coolShard.ShardID {
+	// Only migrate if the hot shard's rate exceeds threshold and imbalance is significant
+	if hotShard != nil && coolShard != nil && maxRate > int64(m.thresholdDepth) && (maxRate-minRate) > int64(m.thresholdDepth)/2 && hotShard.ShardID != coolShard.ShardID {
 		// Don't migrate if we've already migrated recently (cooldown)
 		if len(m.migrations) > 0 {
 			lastMigration := m.migrations[len(m.migrations)-1]
@@ -115,7 +119,7 @@ func (m *LoadMonitor) checkHotspots() {
 				return
 			}
 		}
-		log.Printf("monitor: detected hotspot %s (load %d vs %d), migrating to %s", hotShard.ShardID, maxLoad, minLoad, coolShard.ShardID)
+		log.Printf("monitor: detected hotspot %s (rate %d vs %d), migrating to %s", hotShard.ShardID, maxRate, minRate, coolShard.ShardID)
 		go m.migratePartition(*hotShard, *coolShard)
 	}
 }
@@ -237,4 +241,23 @@ func (m *LoadMonitor) HandlePrometheusMetrics(w http.ResponseWriter, r *http.Req
 		fmt.Fprintf(w, "monitor_tps{shard=\"%s\"} %.2f\n", shardID, metrics.TotalQPS)
 	}
 	fmt.Fprintf(w, "monitor_migration_total %d\n", len(m.migrations))
+}
+
+// HandleShardMap returns the current partition → shard mapping.
+func (m *LoadMonitor) HandleShardMap(w http.ResponseWriter, r *http.Request) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	partitions := make(map[string]string) // partition_id → shard_id
+	for _, shard := range m.shardMap.AllShards() {
+		for _, partID := range m.shardMap.GetPartitionsForShard(shard.ShardID) {
+			partitions[fmt.Sprintf("%d", partID)] = shard.ShardID
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"partitions": partitions,
+		"total":      len(partitions),
+	})
 }
