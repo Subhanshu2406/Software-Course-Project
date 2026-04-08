@@ -45,7 +45,7 @@ down:
 
 # ---- Seed & tokens ----
 seed:
-	bash tests/seed_accounts.sh
+	go run ./cmd/seed
 
 token:
 	@go run cmd/devtoken/main.go

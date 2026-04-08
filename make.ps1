@@ -56,8 +56,8 @@ function make-clean {
 }
 
 function make-seed {
-    Write-Host "Seeding accounts..." -ForegroundColor Green
-    & bash tests/seed_accounts.sh
+    Write-Host "Seeding accounts (direct shard insertion)..." -ForegroundColor Green
+    go run ./cmd/seed
 }
 
 function make-token {
