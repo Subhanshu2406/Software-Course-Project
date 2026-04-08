@@ -348,9 +348,10 @@ func (s *ShardServer) CommitTransaction(txnID string, opType constants.Operation
 		return fmt.Errorf("shard %s: WAL commit-op failed: %w", s.shardID, err)
 	}
 	if s.replicator != nil {
-		err = s.replicator.Replicate(models.WALEntry{LogID: logID, TxnID: txnID, OpType: opType, AccountID: accountID, Amount: amount})
-		if err != nil {
-			return fmt.Errorf("shard %s: replication failed: %w", s.shardID, err)
+		if err := s.replicator.Replicate(models.WALEntry{LogID: logID, TxnID: txnID, OpType: opType, AccountID: accountID, Amount: amount}); err != nil {
+			// Replication failure must NOT abort a commit — 2PC guarantees
+			// that once all shards PREPARE'd, the commit MUST succeed locally.
+			log.Printf("shard %s: WARNING: replication failed during commit of %s (will retry async): %v", s.shardID, txnID, err)
 		}
 	}
 
