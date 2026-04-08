@@ -28,7 +28,7 @@ export default function WALInspector() {
     const q = search.toLowerCase()
     return (
       (e.txn_id || '').toLowerCase().includes(q) ||
-      (e.operation || '').toLowerCase().includes(q) ||
+      (e.op_type || '').toLowerCase().includes(q) ||
       (e.account_id || '').toLowerCase().includes(q)
     )
   })
@@ -93,8 +93,8 @@ export default function WALInspector() {
                   {e.txn_id || '—'}
                 </td>
                 <td className="py-2 px-4">
-                  <span className={OP_COLORS[e.operation] || 'badge-primary'}>
-                    {e.operation || e.type || '—'}
+                  <span className={OP_COLORS[e.op_type] || 'badge-primary'}>
+                    {e.op_type || '—'}
                   </span>
                 </td>
                 <td className="py-2 px-4 font-mono text-xs">{e.account_id || e.account || '—'}</td>
@@ -103,15 +103,9 @@ export default function WALInspector() {
                 </td>
                 <td className="py-2 px-4">
                   <span
-                    className={
-                      e.state === 'committed' || e.state === 'COMMITTED'
-                        ? 'badge-green'
-                        : e.state === 'aborted' || e.state === 'ABORTED'
-                        ? 'badge-red'
-                        : 'badge-amber'
-                    }
+                    className={e.committed ? 'badge-green' : 'badge-amber'}
                   >
-                    {e.state || '—'}
+                    {e.committed ? 'Committed' : 'Pending'}
                   </span>
                 </td>
                 <td className="py-2 px-4 font-mono text-xs text-on-surface-variant">
