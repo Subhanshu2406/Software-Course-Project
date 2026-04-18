@@ -14,7 +14,9 @@
 package server
 
 import (
+	"errors"
 	"fmt"
+	"hash/fnv"
 	"log"
 	"sync"
 	"sync/atomic"
@@ -34,7 +36,10 @@ import (
 // ShardServer is the core of a shard node.
 // It owns a WAL and a Ledger and coordinates safe transaction execution.
 type ShardServer struct {
-	mu         sync.Mutex // serializes transaction execution within this shard
+	stateMu    sync.RWMutex
+	createMu   sync.Mutex
+	recentMu   sync.RWMutex
+	txnStripes [256]sync.Mutex
 	shardID    string
 	walLog     *wal.WAL
 	ledger     *ledger.Ledger
@@ -57,6 +62,9 @@ type ShardServer struct {
 	// Recent transactions ring buffer (cap 500)
 	recentTxns []models.TxnSummary
 }
+
+// ErrAccountExists marks idempotent create-account requests.
+var ErrAccountExists = errors.New("account already exists")
 
 // NewShardServer creates a new shard server, replaying the WAL if one exists.
 // walPath is the path to the WAL file (will be created if it doesn't exist).
@@ -148,9 +156,6 @@ func (s *ShardServer) Checkpoint() error {
 		return fmt.Errorf("shard %s: no storage engine configured", s.shardID)
 	}
 
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	// Snapshot current balances
 	snapshot := s.ledger.Snapshot()
 
@@ -179,26 +184,32 @@ func (s *ShardServer) Checkpoint() error {
 // Implements Algorithm 1 from the report.
 //
 // This is the fast path: no 2PC, no cross-shard coordination.
-// Execution is serialized per shard via the mutex.
 func (s *ShardServer) ExecuteSingleShard(txn models.Transaction) (models.TransactionResult, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	txnMu := s.txnMutex(txn.TxnID)
+	txnMu.Lock()
+	defer txnMu.Unlock()
 
-	// Idempotency check: if we've already processed this txn, return cached result
-	if state, seen := s.seenTxns[txn.TxnID]; seen {
+	if state, started := s.beginTxn(txn.TxnID); !started {
 		return models.TransactionResult{
 			TxnID:   txn.TxnID,
 			State:   state,
 			Message: "idempotent: already processed",
 		}, nil
 	}
+	clearTxnState := true
+	defer func() {
+		if clearTxnState {
+			s.deleteTxnState(txn.TxnID)
+		}
+	}()
 
 	txnStart := time.Now()
 
 	// Step 1: Validate — check source balance before touching anything
 	if err := s.ledger.ValidateDebit(txn.Source, txn.Amount); err != nil {
-		s.seenTxns[txn.TxnID] = constants.StateAborted
+		s.setTxnState(txn.TxnID, constants.StateAborted)
 		s.abortedCount.Add(1)
+		clearTxnState = false
 
 		// Write ABORTED to WAL so recovery knows this was rejected
 		_ = s.walLog.MarkAborted(txn.TxnID)
@@ -239,7 +250,9 @@ func (s *ShardServer) ExecuteSingleShard(txn models.Transaction) (models.Transac
 	if err := s.ledger.ApplyTransfer(txn.Source, txn.Destination, txn.Amount); err != nil {
 		// This should not happen if ValidateDebit passed, but handle defensively
 		_ = s.walLog.MarkAborted(txn.TxnID)
-		s.seenTxns[txn.TxnID] = constants.StateAborted
+		s.setTxnState(txn.TxnID, constants.StateAborted)
+		s.abortedCount.Add(1)
+		clearTxnState = false
 		return models.TransactionResult{
 			TxnID:   txn.TxnID,
 			State:   constants.StateAborted,
@@ -251,20 +264,20 @@ func (s *ShardServer) ExecuteSingleShard(txn models.Transaction) (models.Transac
 	if err := s.walLog.MarkCommitted(txn.TxnID); err != nil {
 		// State is now inconsistent: ledger updated but commit not logged.
 		// In production we would need to handle this more carefully.
-		// For Sprint 1, treat this as a fatal shard error.
+		// Keep the in-memory idempotency state to avoid duplicate applies until restart.
+		s.setTxnState(txn.TxnID, constants.StateCommitted)
+		clearTxnState = false
 		return models.TransactionResult{}, fmt.Errorf("shard %s: WAL commit failed: %w", s.shardID, err)
 	}
 
-	s.seenTxns[txn.TxnID] = constants.StateCommitted
+	s.setTxnState(txn.TxnID, constants.StateCommitted)
 	s.committedCount.Add(1)
+	clearTxnState = false
 	s.addRecentTxn(models.TxnSummary{
 		TxnID: txn.TxnID, Source: txn.Source, Destination: txn.Destination,
 		Amount: txn.Amount, Type: "single", State: constants.StateCommitted,
 		LatencyMs: time.Since(txnStart).Milliseconds(), Timestamp: time.Now().UTC(), ShardID: s.shardID,
 	})
-
-	log.Printf("shard %s: txn %s COMMITTED (debit %s, credit %s, amount %d)",
-		s.shardID, txn.TxnID, txn.Source, txn.Destination, txn.Amount)
 
 	return models.TransactionResult{
 		TxnID:   txn.TxnID,
@@ -279,35 +292,46 @@ func (s *ShardServer) ExecuteSingleShard(txn models.Transaction) (models.Transac
 // is later aborted, the reservation is rolled back.
 // For CREDIT operations, it only validates that the account exists.
 func (s *ShardServer) PrepareTransaction(txnID string, opType constants.OperationType, accountID string, amount int64) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	txnMu := s.txnMutex(txnID)
+	txnMu.Lock()
+	defer txnMu.Unlock()
 
-	if state, seen := s.seenTxns[txnID]; seen && state != constants.StatePending {
-		if state == constants.StatePrepared {
+	if state, seen := s.getTxnState(txnID); seen {
+		if state == constants.StatePrepared || state == constants.StateCommitted {
 			return nil // idempotent
 		}
 		return fmt.Errorf("shard %s: txn %s already in state %s", s.shardID, txnID, state)
 	}
+	s.setTxnState(txnID, constants.StatePending)
+	clearTxnState := true
+	defer func() {
+		if clearTxnState {
+			s.deleteTxnState(txnID)
+		}
+	}()
 
 	if opType == constants.OpDebit {
 		// Validate AND reserve funds by applying the debit now.
 		// This prevents concurrent 2PC transactions from double-spending.
 		if err := s.ledger.ValidateDebit(accountID, amount); err != nil {
 			_ = s.walLog.MarkAborted(txnID)
-			s.seenTxns[txnID] = constants.StateAborted
+			s.setTxnState(txnID, constants.StateAborted)
+			clearTxnState = false
 			return fmt.Errorf("prepare rejected: %w", err)
 		}
 		// Apply debit to reserve funds
 		if err := s.ledger.ApplyDebit(accountID, amount); err != nil {
 			_ = s.walLog.MarkAborted(txnID)
-			s.seenTxns[txnID] = constants.StateAborted
+			s.setTxnState(txnID, constants.StateAborted)
+			clearTxnState = false
 			return fmt.Errorf("prepare debit reserve failed: %w", err)
 		}
 	} else if opType == constants.OpCredit {
 		// For credit, just validate that the account exists
 		if !s.ledger.AccountExists(accountID) {
 			_ = s.walLog.MarkAborted(txnID)
-			s.seenTxns[txnID] = constants.StateAborted
+			s.setTxnState(txnID, constants.StateAborted)
+			clearTxnState = false
 			return fmt.Errorf("prepare rejected: account %s not found", accountID)
 		}
 	}
@@ -322,9 +346,9 @@ func (s *ShardServer) PrepareTransaction(txnID string, opType constants.Operatio
 		return fmt.Errorf("shard %s: WAL prepare failed: %w", s.shardID, err)
 	}
 
-	s.seenTxns[txnID] = constants.StatePrepared
+	s.setTxnState(txnID, constants.StatePrepared)
 	s.preparedCount.Add(1)
-	log.Printf("shard %s: txn %s PREPARED (%s %s amount %d)", s.shardID, txnID, opType, accountID, amount)
+	clearTxnState = false
 	return nil
 }
 
@@ -332,13 +356,14 @@ func (s *ShardServer) PrepareTransaction(txnID string, opType constants.Operatio
 // For DEBIT: funds were already reserved during PREPARE, so we just log and mark committed.
 // For CREDIT: apply the credit now (funds arrive).
 func (s *ShardServer) CommitTransaction(txnID string, opType constants.OperationType, accountID string, amount int64) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	txnMu := s.txnMutex(txnID)
+	txnMu.Lock()
+	defer txnMu.Unlock()
 
-	if state := s.seenTxns[txnID]; state == constants.StateCommitted {
+	if state, seen := s.getTxnState(txnID); seen && state == constants.StateCommitted {
 		return nil // idempotent
 	}
-	if state := s.seenTxns[txnID]; state == constants.StateAborted {
+	if state, seen := s.getTxnState(txnID); seen && state == constants.StateAborted {
 		return fmt.Errorf("shard %s: cannot commit aborted txn %s", s.shardID, txnID)
 	}
 
@@ -367,10 +392,11 @@ func (s *ShardServer) CommitTransaction(txnID string, opType constants.Operation
 	}
 
 	if err := s.walLog.MarkCommitted(txnID); err != nil {
+		s.setTxnState(txnID, constants.StateCommitted)
 		return fmt.Errorf("shard %s: WAL committed marker failed: %w", s.shardID, err)
 	}
 
-	s.seenTxns[txnID] = constants.StateCommitted
+	s.setTxnState(txnID, constants.StateCommitted)
 	s.committedCount.Add(1)
 	s.addRecentTxn(models.TxnSummary{
 		TxnID: txnID, Source: accountID, Destination: "",
@@ -384,15 +410,17 @@ func (s *ShardServer) CommitTransaction(txnID string, opType constants.Operation
 // For DEBIT: reverses the fund reservation made during PREPARE.
 // For CREDIT: no-op since credits are not applied until COMMIT.
 func (s *ShardServer) AbortTransaction(txnID string, opType constants.OperationType, accountID string, amount int64) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	txnMu := s.txnMutex(txnID)
+	txnMu.Lock()
+	defer txnMu.Unlock()
 
-	if state := s.seenTxns[txnID]; state == constants.StateAborted {
+	state, _ := s.getTxnState(txnID)
+	if state == constants.StateAborted {
 		return nil // idempotent
 	}
 
 	// Only rollback debit if we actually reserved funds during PREPARE
-	if opType == constants.OpDebit && s.seenTxns[txnID] == constants.StatePrepared {
+	if opType == constants.OpDebit && state == constants.StatePrepared {
 		if s.ledger.AccountExists(accountID) {
 			_ = s.ledger.RollbackDebit(accountID, amount)
 		}
@@ -403,7 +431,7 @@ func (s *ShardServer) AbortTransaction(txnID string, opType constants.OperationT
 		return fmt.Errorf("shard %s: WAL abort failed: %w", s.shardID, err)
 	}
 
-	s.seenTxns[txnID] = constants.StateAborted
+	s.setTxnState(txnID, constants.StateAborted)
 	s.abortedCount.Add(1)
 	return nil
 }
@@ -420,22 +448,30 @@ func (s *ShardServer) CreateAccount(accountID string, openingBalance int64) erro
 
 // CreateAccountWithWAL creates an account and records it in the WAL for recovery.
 func (s *ShardServer) CreateAccountWithWAL(accountID string, openingBalance int64) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.createMu.Lock()
+	defer s.createMu.Unlock()
 
-	if err := s.ledger.CreateAccount(accountID, openingBalance); err != nil {
-		return err
+	if s.ledger.AccountExists(accountID) {
+		return ErrAccountExists
 	}
 
 	txnID := fmt.Sprintf("create-%s", accountID)
 	if _, err := s.walLog.Append(txnID, constants.OpCreateAccount, accountID, openingBalance); err != nil {
 		return fmt.Errorf("shard %s: WAL append create account failed: %w", s.shardID, err)
 	}
+	if err := s.ledger.CreateAccount(accountID, openingBalance); err != nil {
+		_ = s.walLog.MarkAborted(txnID)
+		if s.ledger.AccountExists(accountID) {
+			return ErrAccountExists
+		}
+		return err
+	}
 	if err := s.walLog.MarkCommitted(txnID); err != nil {
+		s.setTxnState(txnID, constants.StateCommitted)
 		return fmt.Errorf("shard %s: WAL commit create account failed: %w", s.shardID, err)
 	}
 
-	s.seenTxns[txnID] = constants.StateCommitted
+	s.setTxnState(txnID, constants.StateCommitted)
 	return nil
 }
 
@@ -451,9 +487,9 @@ func (s *ShardServer) Snapshot() map[string]int64 {
 
 // GetMetrics returns expanded shard metrics including counters and balances.
 func (s *ShardServer) GetMetrics() models.ShardMetrics {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.stateMu.RLock()
 	followerCount := s.followerCount
+	role := s.role
 	if s.replicator != nil && followerCount == 0 {
 		followerCount = 2 // default assumption
 	}
@@ -464,9 +500,10 @@ func (s *ShardServer) GetMetrics() models.ShardMetrics {
 			pendingCount++
 		}
 	}
+	s.stateMu.RUnlock()
 	return models.ShardMetrics{
 		ShardID:             s.shardID,
-		Role:                s.role,
+		Role:                role,
 		CPUUsage:            20.5,
 		TotalQPS:            float64(s.committedCount.Load()+s.abortedCount.Load()) / max(time.Since(s.startTime).Seconds(), 1),
 		QueueDepth:          pendingCount,
@@ -484,8 +521,9 @@ func (s *ShardServer) GetMetrics() models.ShardMetrics {
 }
 
 // addRecentTxn appends a transaction summary to the ring buffer (cap 500).
-// Caller must hold s.mu.
 func (s *ShardServer) addRecentTxn(t models.TxnSummary) {
+	s.recentMu.Lock()
+	defer s.recentMu.Unlock()
 	if len(s.recentTxns) >= 500 {
 		s.recentTxns = s.recentTxns[1:]
 	}
@@ -494,8 +532,8 @@ func (s *ShardServer) addRecentTxn(t models.TxnSummary) {
 
 // GetRecentTxns returns the last `limit` transactions.
 func (s *ShardServer) GetRecentTxns(limit int) []models.TxnSummary {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.recentMu.RLock()
+	defer s.recentMu.RUnlock()
 	n := len(s.recentTxns)
 	if limit > n {
 		limit = n
@@ -526,8 +564,8 @@ func (s *ShardServer) GetWALEntries(limit int) (entries []models.WALEntry, total
 
 // SetFollowerCount sets the reported follower count.
 func (s *ShardServer) SetFollowerCount(n int) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.stateMu.Lock()
+	defer s.stateMu.Unlock()
 	s.followerCount = n
 }
 
@@ -585,15 +623,15 @@ func (s *ShardServer) Close() error {
 
 // SetRole sets the role of this shard server (PRIMARY or FOLLOWER).
 func (s *ShardServer) SetRole(role string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.stateMu.Lock()
+	defer s.stateMu.Unlock()
 	s.role = role
 }
 
 // Role returns the current role of this shard server.
 func (s *ShardServer) Role() string {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.stateMu.RLock()
+	defer s.stateMu.RUnlock()
 	return s.role
 }
 
@@ -604,8 +642,45 @@ func (s *ShardServer) WAL() *wal.WAL {
 
 // Promote switches this shard from FOLLOWER to PRIMARY.
 func (s *ShardServer) Promote() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.stateMu.Lock()
+	defer s.stateMu.Unlock()
 	s.role = "PRIMARY"
 	log.Printf("shard %s: promoted to PRIMARY", s.shardID)
+}
+
+func (s *ShardServer) beginTxn(txnID string) (constants.TransactionState, bool) {
+	s.stateMu.Lock()
+	defer s.stateMu.Unlock()
+
+	if state, seen := s.seenTxns[txnID]; seen {
+		return state, false
+	}
+	s.seenTxns[txnID] = constants.StatePending
+	return constants.StatePending, true
+}
+
+func (s *ShardServer) getTxnState(txnID string) (constants.TransactionState, bool) {
+	s.stateMu.RLock()
+	defer s.stateMu.RUnlock()
+
+	state, seen := s.seenTxns[txnID]
+	return state, seen
+}
+
+func (s *ShardServer) setTxnState(txnID string, state constants.TransactionState) {
+	s.stateMu.Lock()
+	defer s.stateMu.Unlock()
+	s.seenTxns[txnID] = state
+}
+
+func (s *ShardServer) deleteTxnState(txnID string) {
+	s.stateMu.Lock()
+	defer s.stateMu.Unlock()
+	delete(s.seenTxns, txnID)
+}
+
+func (s *ShardServer) txnMutex(txnID string) *sync.Mutex {
+	hasher := fnv.New32a()
+	_, _ = hasher.Write([]byte(txnID))
+	return &s.txnStripes[hasher.Sum32()%uint32(len(s.txnStripes))]
 }

@@ -32,9 +32,6 @@ func NewCoordinator(client *messaging.ShardClient) *Coordinator {
 // Execute runs the full 2PC protocol for a cross-shard transaction.
 // sourceShard handles the DEBIT; destShard handles the CREDIT.
 func (c *Coordinator) Execute(txn models.Transaction, sourceShard, destShard shardmap.ShardInfo) (models.TransactionResult, error) {
-	log.Printf("2pc: starting txn %s (source shard %s → dest shard %s)",
-		txn.TxnID, sourceShard.ShardID, destShard.ShardID)
-
 	// ---- PHASE 1: PREPARE ----
 	sourcePrepared, destPrepared := c.sendPrepares(txn, sourceShard, destShard)
 
@@ -77,7 +74,6 @@ func (c *Coordinator) sendPrepares(txn models.Transaction, sourceShard, destShar
 			} else {
 				destPrepared = true
 			}
-			log.Printf("2pc: txn %s — shard %s PREPARED", txn.TxnID, r.shardID)
 		}
 	}
 
@@ -88,8 +84,6 @@ func (c *Coordinator) sendPrepares(txn models.Transaction, sourceShard, destShar
 // Once PREPARE has succeeded on both shards, the transaction MUST eventually commit.
 // Both commits run in parallel (like sendPrepares) to halve the commit latency.
 func (c *Coordinator) commitAll(txn models.Transaction, sourceShard, destShard shardmap.ShardInfo) (models.TransactionResult, error) {
-	log.Printf("2pc: txn %s — all shards PREPARED, sending COMMIT", txn.TxnID)
-
 	type commitResult struct {
 		shardID string
 		err     error
@@ -114,7 +108,6 @@ func (c *Coordinator) commitAll(txn models.Transaction, sourceShard, destShard s
 		}
 	}
 
-	log.Printf("2pc: txn %s COMMITTED", txn.TxnID)
 	return models.TransactionResult{
 		TxnID:   txn.TxnID,
 		State:   constants.StateCommitted,
@@ -138,8 +131,6 @@ func (c *Coordinator) commitWithRetry(addr, txnID string, opType constants.Opera
 
 // abortAll sends ABORT to all shards that were prepared.
 func (c *Coordinator) abortAll(txn models.Transaction, sourceShard, destShard shardmap.ShardInfo, sourcePrepared, destPrepared bool) (models.TransactionResult, error) {
-	log.Printf("2pc: txn %s — not all shards prepared, sending ABORT", txn.TxnID)
-
 	if sourcePrepared {
 		if err := c.client.Abort(sourceShard.Address, txn.TxnID, constants.OpDebit, txn.Source, txn.Amount); err != nil {
 			log.Printf("2pc: txn %s — abort debit on shard %s failed: %v", txn.TxnID, sourceShard.ShardID, err)

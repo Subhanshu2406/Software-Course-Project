@@ -341,8 +341,9 @@ services:
     environment:
       MONITOR_ADDR: ":8090"
       SHARD_MAP_PATH: /app/config/shard_map.json
-      POLL_INTERVAL: "5s"
-      HOTSPOT_THRESHOLD: "${HOTSPOT_REQUESTS:-500}"
+      POLL_INTERVAL: "${POLL_INTERVAL:-1s}"
+      HOTSPOT_THRESHOLD: "${HOTSPOT_THRESHOLD:-5}"
+      MIGRATION_COOLDOWN: "${MIGRATION_COOLDOWN:-2s}"
     volumes:
       - ./config:/app/config:ro
     depends_on:

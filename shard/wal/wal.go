@@ -46,13 +46,13 @@ func Open(filePath string) (*WAL, error) {
 		nextLogID: 0,
 	}
 
-	// Count existing entries to set nextLogID correctly after a restart
-	count, err := w.countEntries()
+	// Read the tail record to restore the next log ID without scanning the full WAL.
+	nextLogID, err := w.findNextLogID()
 	if err != nil {
 		f.Close()
-		return nil, fmt.Errorf("wal: failed to count existing entries: %w", err)
+		return nil, fmt.Errorf("wal: failed to restore next log id: %w", err)
 	}
-	w.nextLogID = uint64(count)
+	w.nextLogID = nextLogID
 
 	return w, nil
 }
@@ -356,17 +356,55 @@ func (w *WAL) Truncate(beforeLogID uint64) error {
 
 // --- internal helpers ---
 
-// countEntries reads the file to count existing entries (used on startup).
-func (w *WAL) countEntries() (int, error) {
-	if _, err := w.file.Seek(0, 0); err != nil {
+func (w *WAL) findNextLogID() (uint64, error) {
+	info, err := w.file.Stat()
+	if err != nil {
 		return 0, err
 	}
-	count := 0
-	scanner := bufio.NewScanner(w.file)
-	for scanner.Scan() {
-		if len(scanner.Bytes()) > 0 {
-			count++
+	if info.Size() == 0 {
+		return 0, nil
+	}
+
+	buf := make([]byte, 1)
+	line := make([]byte, 0, 256)
+	foundContent := false
+
+	for offset := info.Size() - 1; offset >= 0; offset-- {
+		if _, err := w.file.ReadAt(buf, offset); err != nil {
+			return 0, err
+		}
+
+		b := buf[0]
+		if b == '\n' || b == '\r' {
+			if foundContent {
+				break
+			}
+			continue
+		}
+
+		foundContent = true
+		line = append(line, b)
+		if offset == 0 {
+			break
 		}
 	}
-	return count, scanner.Err()
+
+	if !foundContent {
+		return 0, nil
+	}
+
+	for left, right := 0, len(line)-1; left < right; left, right = left+1, right-1 {
+		line[left], line[right] = line[right], line[left]
+	}
+
+	var entry models.WALEntry
+	if err := json.Unmarshal(line, &entry); err != nil {
+		return 0, fmt.Errorf("wal: decode tail entry failed: %w", err)
+	}
+
+	if _, err := w.file.Seek(0, 2); err != nil {
+		return 0, err
+	}
+
+	return entry.LogID + 1, nil
 }

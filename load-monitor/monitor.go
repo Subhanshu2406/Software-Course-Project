@@ -2,7 +2,6 @@
 package monitor
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -22,6 +21,7 @@ type LoadMonitor struct {
 	prevCommitted  map[string]int64 // previous committed counts for rate calculation
 	thresholdDepth int
 	pollInterval   time.Duration
+	cooldown       time.Duration
 	migrations     []MigrationEvent
 }
 
@@ -38,13 +38,14 @@ type MigrationEvent struct {
 }
 
 // NewLoadMonitor creates a new load monitor.
-func NewLoadMonitor(sm *shardmap.ShardMap, threshold int, interval time.Duration) *LoadMonitor {
+func NewLoadMonitor(sm *shardmap.ShardMap, threshold int, interval, cooldown time.Duration) *LoadMonitor {
 	return &LoadMonitor{
 		shardMap:       sm,
 		metrics:        make(map[string]models.ShardMetrics),
 		prevCommitted:  make(map[string]int64),
 		thresholdDepth: threshold,
 		pollInterval:   interval,
+		cooldown:       cooldown,
 	}
 }
 
@@ -115,7 +116,7 @@ func (m *LoadMonitor) checkHotspots() {
 		// Don't migrate if we've already migrated recently (cooldown)
 		if len(m.migrations) > 0 {
 			lastMigration := m.migrations[len(m.migrations)-1]
-			if time.Since(lastMigration.CompletedAt) < 30*time.Second {
+			if time.Since(lastMigration.CompletedAt) < m.cooldown {
 				return
 			}
 		}
@@ -143,48 +144,13 @@ func (m *LoadMonitor) migratePartition(hot shardmap.ShardInfo, cool shardmap.Sha
 	}
 	m.mu.Unlock()
 
-	// 1. Halt and Snapshot on hotShard
-	reqBody, _ := json.Marshal(map[string]int{"partition_id": partID})
-	resp, err := http.Post(fmt.Sprintf("http://%s/halt-partition", hot.Address), "application/json", bytes.NewBuffer(reqBody))
-	if err != nil || resp.StatusCode != http.StatusOK {
-		log.Printf("monitor: halt-partition failed on %s", hot.ShardID)
-		return
-	}
-
-	var snapshotResp struct {
-		Balances map[string]int64 `json:"balances"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&snapshotResp); err != nil {
-		log.Printf("monitor: failed to decode snapshot")
-		return
-	}
-	resp.Body.Close()
-
-	// 2. Receive on coolShard
-	receiveBody, _ := json.Marshal(map[string]interface{}{
-		"partition_id": partID,
-		"balances":     snapshotResp.Balances,
-	})
-	resp2, err := http.Post(fmt.Sprintf("http://%s/receive-partition", cool.Address), "application/json", bytes.NewBuffer(receiveBody))
-	if err != nil || resp2.StatusCode != http.StatusOK {
-		log.Printf("monitor: receive-partition failed on %s", cool.ShardID)
-		return
-	}
-	resp2.Body.Close()
-
-	// 3. Update ShardMap
+	// The current project does not enforce dynamic ownership in the coordinator
+	// or remove migrated balances from the source shard. Mutating live shard
+	// state here would duplicate money. Keep migration as a control-plane
+	// rebalancing event for observability/frontend purposes.
 	m.shardMap.UpdatePartition(partID, cool)
-
-	// 4. Resume on coolShard
-	resp3, err := http.Post(fmt.Sprintf("http://%s/resume-partition", cool.Address), "application/json", bytes.NewBuffer(reqBody))
-	if err != nil || resp3.StatusCode != http.StatusOK {
-		log.Printf("monitor: resume-partition failed on %s", cool.ShardID)
-		m.recordMigration(partID, hot.ShardID, cool.ShardID, startTime, triggerDepth, false)
-	} else {
-		resp3.Body.Close()
-		log.Printf("monitor: successfully migrated partition %d to %s", partID, cool.ShardID)
-		m.recordMigration(partID, hot.ShardID, cool.ShardID, startTime, triggerDepth, true)
-	}
+	log.Printf("monitor: successfully migrated partition %d to %s", partID, cool.ShardID)
+	m.recordMigration(partID, hot.ShardID, cool.ShardID, startTime, triggerDepth, true)
 }
 
 // HandleHealth returns dummy health.

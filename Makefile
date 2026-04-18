@@ -85,7 +85,7 @@ test-health:
 	           http://localhost:9083/health http://localhost:9084/health \
 	           http://localhost:9085/health http://localhost:9086/health \
 	           http://localhost:8090/health; do \
-		CODE=$$(curl -s -o /dev/null -w "%{http_code}" "$$url" 2>/dev/null || echo "000"); \
+		CODE=$$(bash scripts/http_code.sh "$$url"); \
 		if [ "$$CODE" = "200" ]; then PASS=$$((PASS+1)); else FAIL=$$((FAIL+1)); echo "  FAIL: $$url ($$CODE)"; fi; \
 	done; \
 	echo "PASS=$$PASS  FAIL=$$FAIL"; \
@@ -133,7 +133,7 @@ test-leader-failover:
 	@echo "Restarting shard1..."
 	docker compose start shard1
 	@ELAPSED=0; while [ $$ELAPSED -lt 30 ]; do \
-		CODE=$$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8081/health 2>/dev/null || echo "000"); \
+		CODE=$$(bash scripts/http_code.sh http://localhost:8081/health); \
 		if [ "$$CODE" = "200" ]; then echo "[PASS] T8 Leader Failover — shard1 recovered"; break; fi; \
 		sleep 2; ELAPSED=$$((ELAPSED+2)); \
 	done; \
@@ -146,7 +146,7 @@ test-coordinator-kill:
 	@sleep 5
 	docker compose start coordinator
 	@ELAPSED=0; while [ $$ELAPSED -lt 30 ]; do \
-		CODE=$$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/health 2>/dev/null || echo "000"); \
+		CODE=$$(bash scripts/http_code.sh http://localhost:8080/health); \
 		if [ "$$CODE" = "200" ]; then echo "[PASS] T9 Coordinator Kill — recovered"; break; fi; \
 		sleep 2; ELAPSED=$$((ELAPSED+2)); \
 	done; \
@@ -157,13 +157,13 @@ test-multi-coordinator:
 	@echo ""; echo "=== T10: Multi-Coordinator ==="
 	COMPOSE_PROFILES=$${COMPOSE_PROFILES},multi-coordinator docker compose up -d coordinator2
 	@ELAPSED=0; while [ $$ELAPSED -lt 30 ]; do \
-		CODE=$$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8079/health 2>/dev/null || echo "000"); \
+		CODE=$$(bash scripts/http_code.sh http://localhost:8079/health); \
 		if [ "$$CODE" = "200" ]; then break; fi; \
 		sleep 2; ELAPSED=$$((ELAPSED+2)); \
 	done; \
-	RESP=$$(curl -s -o /dev/null -w "%{http_code}" -X POST http://localhost:8079/submit \
+	RESP=$$(bash scripts/http_code.sh -X POST http://localhost:8079/submit \
 		-H "Content-Type: application/json" \
-		-d '{"txn_id":"mc-test-1","source":"user0","destination":"user1","amount":1}' 2>/dev/null || echo "000"); \
+		-d '{"txn_id":"mc-test-1","source":"user0","destination":"user1","amount":1}'); \
 	if [ "$$RESP" = "200" ] || [ "$$RESP" = "202" ]; then \
 		echo "[PASS] T10 Multi-Coordinator — coordinator2 accepts transactions"; \
 	else \
@@ -179,9 +179,9 @@ test-migration:
 test-scale:
 	@echo ""; echo "=== T12: Scale Test ==="
 	@echo "Currently running with 3 shards. Verifying shard count..."
-	@S1=$$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8081/health 2>/dev/null || echo "000"); \
-	 S2=$$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8082/health 2>/dev/null || echo "000"); \
-	 S3=$$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8083/health 2>/dev/null || echo "000"); \
+	@S1=$$(bash scripts/http_code.sh http://localhost:8081/health); \
+	 S2=$$(bash scripts/http_code.sh http://localhost:8082/health); \
+	 S3=$$(bash scripts/http_code.sh http://localhost:8083/health); \
 	 COUNT=0; \
 	 if [ "$$S1" = "200" ]; then COUNT=$$((COUNT+1)); fi; \
 	 if [ "$$S2" = "200" ]; then COUNT=$$((COUNT+1)); fi; \

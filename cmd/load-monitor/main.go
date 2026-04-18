@@ -22,8 +22,9 @@ func envOrDefault(key, fallback string) string {
 func main() {
 	addr := envOrDefault("MONITOR_ADDR", ":8090")
 	shardMapPath := envOrDefault("SHARD_MAP_PATH", "./config/shard_map.json")
-	pollIntervalStr := envOrDefault("POLL_INTERVAL", "5s")
-	thresholdStr := envOrDefault("HOTSPOT_THRESHOLD", "500")
+	pollIntervalStr := envOrDefault("POLL_INTERVAL", "1s")
+	thresholdStr := envOrDefault("HOTSPOT_THRESHOLD", "5")
+	cooldownStr := envOrDefault("MIGRATION_COOLDOWN", "2s")
 
 	pollInterval, err := time.ParseDuration(pollIntervalStr)
 	if err != nil {
@@ -35,12 +36,17 @@ func main() {
 		log.Fatalf("invalid HOTSPOT_THRESHOLD: %v", err)
 	}
 
+	cooldown, err := time.ParseDuration(cooldownStr)
+	if err != nil {
+		log.Fatalf("invalid MIGRATION_COOLDOWN: %v", err)
+	}
+
 	sm, err := shardmap.LoadShardMap(shardMapPath)
 	if err != nil {
 		log.Fatalf("failed to load shard map from %s: %v", shardMapPath, err)
 	}
 
-	lm := monitor.NewLoadMonitor(sm, threshold, pollInterval)
+	lm := monitor.NewLoadMonitor(sm, threshold, pollInterval, cooldown)
 	lm.Start()
 
 	mux := http.NewServeMux()
@@ -54,7 +60,7 @@ func main() {
 	mux.HandleFunc("/metrics/prometheus", lm.HandlePrometheusMetrics)
 	mux.HandleFunc("/shard-map", lm.HandleShardMap)
 
-	log.Printf("Load Monitor listening on %s (poll=%s, threshold=%d)", addr, pollInterval, threshold)
+	log.Printf("Load Monitor listening on %s (poll=%s, threshold=%d, cooldown=%s)", addr, pollInterval, threshold, cooldown)
 	if err := http.ListenAndServe(addr, mux); err != nil {
 		log.Fatalf("load monitor failed: %v", err)
 	}

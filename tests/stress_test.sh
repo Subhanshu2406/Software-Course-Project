@@ -16,12 +16,189 @@ SHARD3_URL=${SHARD3_URL:-"http://localhost:8083"}
 MONITOR_URL=${MONITOR_URL:-"http://localhost:8090"}
 NUM_ACCOUNTS=${NUM_ACCOUNTS:-1000}
 STARTING_BALANCE=${STARTING_BALANCE:-10000}
+PHASE1_REQUESTS=${PHASE1_REQUESTS:-600}
+PHASE2_REQUESTS=${PHASE2_REQUESTS:-300}
+PHASE5_REQUESTS=${PHASE5_REQUESTS:-600}
+MIGRATION_WAIT_S=${MIGRATION_WAIT_S:-30}
+BURST_BATCH_SIZE=${BURST_BATCH_SIZE:-50}
 
 PASSED=0
 FAILED=0
 
 pass() { echo "  PASS: $1"; PASSED=$((PASSED + 1)); }
 fail() { echo "  FAIL: $1"; FAILED=$((FAILED + 1)); }
+
+get_total_queue_depth() {
+    local total=0
+    local metrics depth
+    for URL in "$SHARD1_URL" "$SHARD2_URL" "$SHARD3_URL"; do
+        metrics=$(curl -s --connect-timeout 2 --max-time 5 "$URL/metrics" 2>/dev/null || echo "")
+        depth=$(printf '%s' "$metrics" | grep -o '"queue_depth":[0-9]*' | head -1 | cut -d: -f2)
+        depth=${depth:-0}
+        total=$((total + depth))
+    done
+    echo "$total"
+}
+
+wait_for_quiescence() {
+    local stable=0
+    local depth=0
+    for _ in $(seq 1 20); do
+        depth=$(get_total_queue_depth)
+        if [ "${depth:-0}" -eq 0 ]; then
+            stable=$((stable + 1))
+            if [ $stable -ge 2 ]; then
+                return 0
+            fi
+        else
+            stable=0
+        fi
+        sleep 1
+    done
+    return 1
+}
+
+stable_sum() {
+    local prev=""
+    local curr="0"
+    wait_for_quiescence >/dev/null 2>&1 || true
+    for _ in $(seq 1 5); do
+        curr=$(bash tests/check_invariant.sh --sum-only 2>/dev/null || echo "0")
+        curr=$(printf '%s' "$curr" | tr -cd '0-9-')
+        curr=${curr:-0}
+        if [ -n "$prev" ] && [ "$curr" = "$prev" ]; then
+            echo "$curr"
+            return 0
+        fi
+        prev="$curr"
+        sleep 1
+    done
+    echo "$curr"
+}
+
+get_migration_count() {
+    local resp count
+    resp=$(curl -s --connect-timeout 2 --max-time 5 "$MONITOR_URL/migrations" 2>/dev/null || echo "{}")
+    count=$(printf '%s' "$resp" | grep -o '"partition_id"' | wc -l | tr -d '[:space:]')
+    count=$(printf '%s' "${count:-0}" | tr -cd '0-9')
+    echo "${count:-0}"
+}
+
+wait_for_migration_growth() {
+    local before=${1:-0}
+    local timeout=${2:-30}
+    local elapsed=0
+    local current=0
+    while [ $elapsed -lt $timeout ]; do
+        current=$(get_migration_count)
+        if [ "${current:-0}" -gt "${before:-0}" ]; then
+            echo "$current"
+            return 0
+        fi
+        sleep 2
+        elapsed=$((elapsed + 2))
+    done
+    echo "${current:-0}"
+    return 1
+}
+
+find_account_on_shard() {
+    local shard_url=$1
+    local skip=${2:-}
+    local account resp
+    for i in $(seq 0 $((NUM_ACCOUNTS - 1))); do
+        account="user$i"
+        if [ -n "$skip" ] && [ "$account" = "$skip" ]; then
+            continue
+        fi
+        resp=$(curl -s --connect-timeout 2 --max-time 3 "$shard_url/balance?account=$account" 2>/dev/null || echo '{"exists":false}')
+        if printf '%s' "$resp" | grep -q '"exists":true'; then
+            echo "$account"
+            return 0
+        fi
+    done
+    return 1
+}
+
+discover_hot_accounts() {
+    HOT_SRC=$(find_account_on_shard "$SHARD1_URL") || return 1
+    HOT_DST=$(find_account_on_shard "$SHARD1_URL" "$HOT_SRC") || return 1
+
+    CROSS_DST=$(find_account_on_shard "$SHARD2_URL")
+    if [ -z "${CROSS_DST:-}" ]; then
+        CROSS_DST=$(find_account_on_shard "$SHARD3_URL") || return 1
+    fi
+    return 0
+}
+
+submit_cross_shard_burst() {
+    local count=$1
+    local tmpfile
+    tmpfile=$(mktemp)
+    : > "$tmpfile"
+
+    for i in $(seq 1 "$count"); do
+        (
+            code=$(bash scripts/http_code.sh -X POST "$COORDINATOR_URL/submit" \
+                -H "Content-Type: application/json" \
+                -d "{\"txn_id\":\"stress-cs-$i\",\"source\":\"$HOT_SRC\",\"destination\":\"$CROSS_DST\",\"amount\":1}")
+            printf '%s\n' "$code" >> "$tmpfile"
+        ) &
+        if [ $((i % BURST_BATCH_SIZE)) -eq 0 ]; then
+            wait 2>/dev/null || true
+        fi
+    done
+    wait 2>/dev/null || true
+
+    CS_SUCCESS=0
+    CS_FAIL=0
+    while IFS= read -r code; do
+        if [ "$code" = "200" ] || [ "$code" = "202" ]; then
+            CS_SUCCESS=$((CS_SUCCESS + 1))
+        else
+            CS_FAIL=$((CS_FAIL + 1))
+        fi
+    done < "$tmpfile"
+    rm -f "$tmpfile"
+}
+
+submit_same_shard_burst() {
+    local count=$1
+    local tmpfile
+    tmpfile=$(mktemp)
+    : > "$tmpfile"
+
+    for i in $(seq 1 "$count"); do
+        if [ $((i % 2)) -eq 1 ]; then
+            SRC="$HOT_SRC"
+            DST="$HOT_DST"
+        else
+            SRC="$HOT_DST"
+            DST="$HOT_SRC"
+        fi
+        (
+            code=$(bash scripts/http_code.sh -X POST "$COORDINATOR_URL/submit" \
+                -H "Content-Type: application/json" \
+                -d "{\"txn_id\":\"stress-ss-$i\",\"source\":\"$SRC\",\"destination\":\"$DST\",\"amount\":1}")
+            printf '%s\n' "$code" >> "$tmpfile"
+        ) &
+        if [ $((i % BURST_BATCH_SIZE)) -eq 0 ]; then
+            wait 2>/dev/null || true
+        fi
+    done
+    wait 2>/dev/null || true
+
+    SS_SUCCESS=0
+    SS_FAIL=0
+    while IFS= read -r code; do
+        if [ "$code" = "200" ] || [ "$code" = "202" ]; then
+            SS_SUCCESS=$((SS_SUCCESS + 1))
+        else
+            SS_FAIL=$((SS_FAIL + 1))
+        fi
+    done < "$tmpfile"
+    rm -f "$tmpfile"
+}
 
 echo "=============================================="
 echo "  COMPREHENSIVE STRESS TEST SUITE"
@@ -30,53 +207,49 @@ echo ""
 
 # ---- Phase 0: Pre-flight Invariant Snapshot ----
 echo "--- Phase 0: Pre-flight Invariant Check ---"
-PRE_TOTAL=$(bash tests/check_invariant.sh --sum-only 2>/dev/null || echo "0")
+PRE_TOTAL=$(stable_sum)
 echo "  Pre-flight system balance: $PRE_TOTAL"
-EXPECTED=$((NUM_ACCOUNTS * STARTING_BALANCE * 3))
+EXPECTED=$((NUM_ACCOUNTS * STARTING_BALANCE))
 if [ "$PRE_TOTAL" -eq "$EXPECTED" ]; then
     pass "Pre-flight invariant holds ($PRE_TOTAL == $EXPECTED)"
 else
     echo "  WARNING: Pre-flight invariant delta=$((PRE_TOTAL - EXPECTED)); tests will use current balance as baseline"
     EXPECTED=$PRE_TOTAL
 fi
+if discover_hot_accounts; then
+    echo "  Targeted same-shard hot accounts: $HOT_SRC <-> $HOT_DST on shard1"
+    echo "  Targeted cross-shard path:        $HOT_SRC -> $CROSS_DST"
+else
+    echo "  ERROR: Could not discover test accounts for targeted hotspot load"
+    exit 1
+fi
 echo ""
 
 # ---- Phase 1: Sustained Load with Invariant Checks ----
 echo "--- Phase 1: Sustained Load + Invariant Monitoring ---"
-echo "  Submitting 200 single-shard transfers under sustained load..."
+echo "  Submitting $PHASE1_REQUESTS single-shard transfers under sustained load..."
 
-BATCH_SUCCESS=0
-BATCH_FAIL=0
-for i in $(seq 1 200); do
-    # Pick accounts that likely hash to the same shard
-    SRC=$((i % NUM_ACCOUNTS))
-    DST=$(( (SRC + 1) % NUM_ACCOUNTS ))
-    RESP=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$COORDINATOR_URL/submit" \
-        -H "Content-Type: application/json" \
-        -d "{\"txn_id\":\"stress-ss-$i\",\"source\":\"user$SRC\",\"destination\":\"user$DST\",\"amount\":1}" \
-        2>/dev/null || echo "000")
-    if [ "$RESP" = "200" ] || [ "$RESP" = "202" ]; then
-        BATCH_SUCCESS=$((BATCH_SUCCESS + 1))
-    else
-        BATCH_FAIL=$((BATCH_FAIL + 1))
-    fi
+PHASE1_MIGRATIONS_BEFORE=$(get_migration_count)
+submit_same_shard_burst "$PHASE1_REQUESTS"
 
-    if [ $((i % 50)) -eq 0 ]; then
-        echo "  Progress: $i/200 (success=$BATCH_SUCCESS, fail=$BATCH_FAIL)"
-    fi
-done
-
-echo "  Single-shard batch: success=$BATCH_SUCCESS, fail=$BATCH_FAIL"
-if [ $BATCH_SUCCESS -gt 150 ]; then
-    pass "Single-shard sustained load ($BATCH_SUCCESS/200 succeeded)"
+echo "  Single-shard batch: success=$SS_SUCCESS, fail=$SS_FAIL"
+if [ $SS_SUCCESS -gt $((PHASE1_REQUESTS * 3 / 4)) ]; then
+    pass "Single-shard sustained load ($SS_SUCCESS/$PHASE1_REQUESTS succeeded)"
 else
-    fail "Single-shard sustained load too many failures ($BATCH_FAIL/200)"
+    fail "Single-shard sustained load too many failures ($SS_FAIL/$PHASE1_REQUESTS)"
+fi
+
+PHASE1_MIGRATIONS_AFTER=$(wait_for_migration_growth "$PHASE1_MIGRATIONS_BEFORE" "$MIGRATION_WAIT_S" || true)
+if [ "${PHASE1_MIGRATIONS_AFTER:-0}" -gt "${PHASE1_MIGRATIONS_BEFORE:-0}" ]; then
+    pass "Migration observed during Phase 1 (count=${PHASE1_MIGRATIONS_AFTER})"
+else
+    fail "No migration observed during Phase 1"
 fi
 
 sleep 2
 
 # Mid-test invariant check
-MID_TOTAL=$(bash tests/check_invariant.sh --sum-only 2>/dev/null || echo "0")
+MID_TOTAL=$(stable_sum)
 echo "  Mid-test invariant: $MID_TOTAL (expected: $EXPECTED, delta: $((MID_TOTAL - EXPECTED)))"
 if [ "$MID_TOTAL" -eq "$EXPECTED" ]; then
     pass "Invariant holds after single-shard load"
@@ -87,35 +260,29 @@ echo ""
 
 # ---- Phase 2: Cross-Shard Transactions ----
 echo "--- Phase 2: Cross-Shard Transaction Stress ---"
-echo "  Submitting 100 cross-shard transfers..."
+echo "  Submitting $PHASE2_REQUESTS cross-shard transfers..."
 
-CS_SUCCESS=0
-CS_FAIL=0
-for i in $(seq 1 100); do
-    SRC=$((i % 333))
-    DST=$(( 500 + (i % 333) ))
-    RESP=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$COORDINATOR_URL/submit" \
-        -H "Content-Type: application/json" \
-        -d "{\"txn_id\":\"stress-cs-$i\",\"source\":\"user$SRC\",\"destination\":\"user$DST\",\"amount\":1}" \
-        2>/dev/null || echo "000")
-    if [ "$RESP" = "200" ] || [ "$RESP" = "202" ]; then
-        CS_SUCCESS=$((CS_SUCCESS + 1))
-    else
-        CS_FAIL=$((CS_FAIL + 1))
-    fi
-done
+PHASE2_MIGRATIONS_BEFORE=$(get_migration_count)
+submit_cross_shard_burst "$PHASE2_REQUESTS"
 
 echo "  Cross-shard batch: success=$CS_SUCCESS, fail=$CS_FAIL"
-if [ $CS_SUCCESS -gt 70 ]; then
-    pass "Cross-shard transactions ($CS_SUCCESS/100 succeeded)"
+if [ $CS_SUCCESS -gt $((PHASE2_REQUESTS * 7 / 10)) ]; then
+    pass "Cross-shard transactions ($CS_SUCCESS/$PHASE2_REQUESTS succeeded)"
 else
-    fail "Cross-shard transactions too many failures ($CS_FAIL/100)"
+    fail "Cross-shard transactions too many failures ($CS_FAIL/$PHASE2_REQUESTS)"
+fi
+
+PHASE2_MIGRATIONS_AFTER=$(wait_for_migration_growth "$PHASE2_MIGRATIONS_BEFORE" "$MIGRATION_WAIT_S" || true)
+if [ "${PHASE2_MIGRATIONS_AFTER:-0}" -gt "${PHASE2_MIGRATIONS_BEFORE:-0}" ]; then
+    pass "Migration observed during Phase 2 (count=${PHASE2_MIGRATIONS_AFTER})"
+else
+    fail "No migration observed during Phase 2"
 fi
 
 sleep 2
 
 # Post-cross-shard invariant
-CS_TOTAL=$(bash tests/check_invariant.sh --sum-only 2>/dev/null || echo "0")
+CS_TOTAL=$(stable_sum)
 echo "  Post-cross-shard invariant: $CS_TOTAL (delta: $((CS_TOTAL - EXPECTED)))"
 if [ "$CS_TOTAL" -eq "$EXPECTED" ]; then
     pass "Invariant holds after cross-shard load"
@@ -139,7 +306,7 @@ echo "  Pre-crash balances: $PRE_CRASH_BAL"
 # Submit transactions concurrent with a crash
 echo "  Submitting 30 transactions then killing shard1..."
 for i in $(seq 1 30); do
-    curl -s -X POST "$COORDINATOR_URL/submit" \
+    curl -s --connect-timeout 2 --max-time 5 -X POST "$COORDINATOR_URL/submit" \
         -H "Content-Type: application/json" \
         -d "{\"txn_id\":\"stress-wal-$i\",\"source\":\"user0\",\"destination\":\"user1\",\"amount\":1}" \
         -o /dev/null &
@@ -160,7 +327,7 @@ echo "  Waiting for shard1 to recover..."
 ELAPSED=0
 SHARD1_RECOVERED=false
 while [ $ELAPSED -lt 60 ]; do
-    STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$SHARD1_URL/health" 2>/dev/null || echo "000")
+    STATUS=$(bash scripts/http_code.sh "$SHARD1_URL/health")
     if [ "$STATUS" = "200" ]; then
         SHARD1_RECOVERED=true
         break
@@ -182,10 +349,9 @@ if [ "$SHARD1_RECOVERED" = "true" ]; then
     echo "    $POST_CRASH_BAL"
     
     # Verify system can still process transactions after recovery
-    RESP=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$COORDINATOR_URL/submit" \
+    RESP=$(bash scripts/http_code.sh -X POST "$COORDINATOR_URL/submit" \
         -H "Content-Type: application/json" \
-        -d "{\"txn_id\":\"stress-post-crash-1\",\"source\":\"user0\",\"destination\":\"user1\",\"amount\":1}" \
-        2>/dev/null || echo "000")
+        -d "{\"txn_id\":\"stress-post-crash-1\",\"source\":\"user0\",\"destination\":\"user1\",\"amount\":1}")
     if [ "$RESP" = "200" ] || [ "$RESP" = "202" ]; then
         pass "Post-recovery transaction succeeded"
     else
@@ -198,7 +364,7 @@ fi
 sleep 2
 
 # Post-WAL invariant check
-WAL_TOTAL=$(bash tests/check_invariant.sh --sum-only 2>/dev/null || echo "0")
+WAL_TOTAL=$(stable_sum)
 echo "  Post-WAL-crash invariant: $WAL_TOTAL (delta: $((WAL_TOTAL - EXPECTED)))"
 if [ "$WAL_TOTAL" -eq "$EXPECTED" ]; then
     pass "Invariant holds after WAL crash recovery"
@@ -214,7 +380,7 @@ echo "--- Phase 4: Coordinator Kill Under Load ---"
 
 echo "  Submitting 50 concurrent transactions..."
 for i in $(seq 1 50); do
-    curl -s -X POST "$COORDINATOR_URL/submit" \
+    curl -s --connect-timeout 2 --max-time 5 -X POST "$COORDINATOR_URL/submit" \
         -H "Content-Type: application/json" \
         -d "{\"txn_id\":\"stress-coord-$i\",\"source\":\"user$((i % 500))\",\"destination\":\"user$((500 + i % 500))\",\"amount\":1}" \
         -o /dev/null &
@@ -233,7 +399,7 @@ docker compose start coordinator 2>/dev/null
 ELAPSED=0
 COORD_RECOVERED=false
 while [ $ELAPSED -lt 30 ]; do
-    STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$COORDINATOR_URL/health" 2>/dev/null || echo "000")
+    STATUS=$(bash scripts/http_code.sh "$COORDINATOR_URL/health")
     if [ "$STATUS" = "200" ]; then
         COORD_RECOVERED=true
         break
@@ -246,10 +412,9 @@ if [ "$COORD_RECOVERED" = "true" ]; then
     pass "Coordinator recovered ($ELAPSED s)"
     
     # Verify can still submit
-    RESP=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$COORDINATOR_URL/submit" \
+    RESP=$(bash scripts/http_code.sh -X POST "$COORDINATOR_URL/submit" \
         -H "Content-Type: application/json" \
-        -d "{\"txn_id\":\"stress-post-coord-1\",\"source\":\"user0\",\"destination\":\"user1\",\"amount\":1}" \
-        2>/dev/null || echo "000")
+        -d "{\"txn_id\":\"stress-post-coord-1\",\"source\":\"user0\",\"destination\":\"user1\",\"amount\":1}")
     if [ "$RESP" = "200" ] || [ "$RESP" = "202" ]; then
         pass "Post-coordinator-recovery transaction succeeded"
     else
@@ -264,10 +429,18 @@ echo ""
 echo "--- Phase 5: Migration Under Load ---"
 
 echo "  Generating targeted load to trigger migration..."
-for i in $(seq 1 300); do
-    curl -s -X POST "$COORDINATOR_URL/submit" \
+PHASE5_MIGRATIONS_BEFORE=$(get_migration_count)
+for i in $(seq 1 "$PHASE5_REQUESTS"); do
+    if [ $((i % 2)) -eq 1 ]; then
+        SRC="$HOT_SRC"
+        DST="$HOT_DST"
+    else
+        SRC="$HOT_DST"
+        DST="$HOT_SRC"
+    fi
+    curl -s --connect-timeout 2 --max-time 5 -X POST "$COORDINATOR_URL/submit" \
         -H "Content-Type: application/json" \
-        -d "{\"txn_id\":\"stress-mig-$i\",\"source\":\"user0\",\"destination\":\"user1\",\"amount\":1}" \
+        -d "{\"txn_id\":\"stress-mig-$i\",\"source\":\"$SRC\",\"destination\":\"$DST\",\"amount\":1}" \
         -o /dev/null &
     if [ $((i % 50)) -eq 0 ]; then
         wait 2>/dev/null || true
@@ -275,34 +448,20 @@ for i in $(seq 1 300); do
 done
 wait 2>/dev/null || true
 
-echo "  Checking load-monitor for migrations (30s timeout)..."
-ELAPSED=0
-MIGRATION_FOUND=false
-while [ $ELAPSED -lt 30 ]; do
-    MIGRATION_RESP=$(curl -s "$MONITOR_URL/migrations" 2>/dev/null || echo "{}")
-    MIGRATION_COUNT=$(echo "$MIGRATION_RESP" | grep -o '"partition_id"' | wc -l || echo "0")
-    if [ "$MIGRATION_COUNT" -gt 0 ]; then
-        MIGRATION_FOUND=true
-        echo "  Detected $MIGRATION_COUNT migration(s)"
-        break
-    fi
-    sleep 5
-    ELAPSED=$((ELAPSED + 5))
-done
-
-if [ "$MIGRATION_FOUND" = "true" ]; then
+echo "  Checking load-monitor for migrations (${MIGRATION_WAIT_S}s timeout)..."
+PHASE5_MIGRATIONS_AFTER=$(wait_for_migration_growth "$PHASE5_MIGRATIONS_BEFORE" "$MIGRATION_WAIT_S" || true)
+if [ "${PHASE5_MIGRATIONS_AFTER:-0}" -gt "${PHASE5_MIGRATIONS_BEFORE:-0}" ]; then
+    echo "  Detected ${PHASE5_MIGRATIONS_AFTER} migration(s)"
     pass "Migration triggered under load"
 else
-    echo "  NOTE: No migration triggered (threshold may not have been reached)"
-    echo "  PASS (conditional): Load monitor is running"
-    PASSED=$((PASSED + 1))
+    fail "No migration triggered during Phase 5"
 fi
 echo ""
 
 # ---- Phase 6: Final Invariant ----
 echo "--- Phase 6: Final Invariant Check ---"
 sleep 3
-FINAL_TOTAL=$(bash tests/check_invariant.sh --sum-only 2>/dev/null || echo "0")
+FINAL_TOTAL=$(stable_sum)
 DELTA=$((FINAL_TOTAL - EXPECTED))
 echo "  Final system balance: $FINAL_TOTAL"
 echo "  Expected:             $EXPECTED"

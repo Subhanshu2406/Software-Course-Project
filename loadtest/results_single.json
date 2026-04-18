@@ -1,15 +1,16 @@
 {
+  "run_id": "1776485929110-8e1e7vwj",
   "scenario": "single_shard",
   "single_shard": {
-    "p95": 706.4234466999994,
-    "avg": 322.5414796358485
+    "p95": 579.1769234,
+    "avg": 263.9149183785304
   },
   "cross_shard": {
     "p95": 0,
     "avg": 0
   },
-  "total_requests": 9367,
-  "tps": 128.7747510366421,
-  "error_rate": 0.04825451051564001,
-  "overall_p95": 706.4234466999994
+  "total_requests": 10937,
+  "tps": 181.4505963504458,
+  "error_rate": 0,
+  "overall_p95": 579.1769234
 }

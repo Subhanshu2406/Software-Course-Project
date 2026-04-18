@@ -47,7 +47,7 @@ docker compose start shard1 2>/dev/null
 echo "  Waiting for shard1 to recover..."
 ELAPSED=0
 while [ $ELAPSED -lt 30 ]; do
-    STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$SHARD1_URL/health" 2>/dev/null || echo "000")
+    STATUS=$(bash scripts/http_code.sh "$SHARD1_URL/health")
     if [ "$STATUS" = "200" ]; then
         break
     fi
@@ -87,9 +87,9 @@ docker compose stop shard2a 2>/dev/null
 # Continue submitting to shard2
 SUBMIT_OK=0
 for i in $(seq 1 10); do
-    RESP=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$COORDINATOR_URL/submit" \
+    RESP=$(bash scripts/http_code.sh -X POST "$COORDINATOR_URL/submit" \
         -H "Content-Type: application/json" \
-        -d "{\"txn_id\":\"fail2-during-$i\",\"source\":\"user0\",\"destination\":\"user1\",\"amount\":1}" 2>/dev/null || echo "000")
+        -d "{\"txn_id\":\"fail2-during-$i\",\"source\":\"user0\",\"destination\":\"user1\",\"amount\":1}")
     if [ "$RESP" = "200" ] || [ "$RESP" = "202" ]; then
         SUBMIT_OK=$((SUBMIT_OK + 1))
     fi
@@ -136,7 +136,7 @@ docker compose start coordinator 2>/dev/null
 # Wait for coordinator health
 ELAPSED=0
 while [ $ELAPSED -lt 30 ]; do
-    STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$COORDINATOR_URL/health" 2>/dev/null || echo "000")
+    STATUS=$(bash scripts/http_code.sh "$COORDINATOR_URL/health")
     if [ "$STATUS" = "200" ]; then
         break
     fi
@@ -178,9 +178,9 @@ if [ -n "$NETWORK" ] && [ -n "$SHARD1_CONTAINER" ]; then
     # Submit transactions — should fail gracefully
     FAIL_COUNT=0
     for i in $(seq 1 5); do
-        RESP=$(curl -s -o /dev/null -w "%{http_code}" --max-time 3 -X POST "$COORDINATOR_URL/submit" \
+        RESP=$(bash scripts/http_code.sh --max-time 3 -X POST "$COORDINATOR_URL/submit" \
             -H "Content-Type: application/json" \
-            -d "{\"txn_id\":\"fail4-$i\",\"source\":\"user0\",\"destination\":\"user1\",\"amount\":1}" 2>/dev/null || echo "000")
+            -d "{\"txn_id\":\"fail4-$i\",\"source\":\"user0\",\"destination\":\"user1\",\"amount\":1}")
         if [ "$RESP" != "200" ] && [ "$RESP" != "202" ]; then
             FAIL_COUNT=$((FAIL_COUNT + 1))
         fi
@@ -193,7 +193,7 @@ if [ -n "$NETWORK" ] && [ -n "$SHARD1_CONTAINER" ]; then
 
     # Wait for recovery
     sleep 5
-    STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$SHARD1_URL/health" 2>/dev/null || echo "000")
+    STATUS=$(bash scripts/http_code.sh "$SHARD1_URL/health")
 
     if [ "$STATUS" = "200" ]; then
         pass "System recovered from network partition ($FAIL_COUNT/5 txns failed gracefully)"

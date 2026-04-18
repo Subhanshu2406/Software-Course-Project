@@ -11,6 +11,7 @@ const LOAD_DURATION = __ENV.LOAD_DURATION || '30s';
 const SCENARIO = __ENV.SCENARIO || 'mixed'; // single_shard, cross_shard, or mixed
 const NUM_PARTITIONS = 30;
 const POW32_MOD_N = Math.pow(2, 32) % NUM_PARTITIONS; // = 16
+const RUN_ID = __ENV.RUN_ID || `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 
 // Custom metrics
 const singleShardTxns = new Counter('single_shard_txns');
@@ -109,7 +110,7 @@ export function singleShard() {
   const [srcIdx, dstIdx] = sameShardPair();
 
   const payload = JSON.stringify({
-    txn_id: `txn-k6-ss-${__VU}-${__ITER}`,
+    txn_id: `txn-k6-ss-${RUN_ID}-${__VU}-${__ITER}`,
     source: `user${srcIdx}`,
     destination: `user${dstIdx}`,
     amount: 1,
@@ -130,7 +131,7 @@ export function crossShard() {
   const [srcIdx, dstIdx] = crossShardPair();
 
   const payload = JSON.stringify({
-    txn_id: `txn-k6-cs-${__VU}-${__ITER}`,
+    txn_id: `txn-k6-cs-${RUN_ID}-${__VU}-${__ITER}`,
     source: `user${srcIdx}`,
     destination: `user${dstIdx}`,
     amount: 1,
@@ -154,6 +155,7 @@ export function handleSummary(data) {
   const dur = data.metrics.http_req_duration;
 
   const summary = {
+    run_id: RUN_ID,
     scenario: SCENARIO,
     single_shard: {
       count: ss ? ss.values.count : 0,

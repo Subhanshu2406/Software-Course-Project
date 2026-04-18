@@ -13,6 +13,7 @@
 package server
 
 import (
+	"errors"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -389,8 +390,11 @@ func (h *HTTPHandler) handleCreateAccount(w http.ResponseWriter, r *http.Request
 	}
 
 	if err := h.server.CreateAccountWithWAL(req.AccountID, req.Balance); err != nil {
-		// Account may already exist — treat as idempotent success
-		writeJSON(w, http.StatusOK, map[string]string{"status": "exists", "account_id": req.AccountID})
+		if errors.Is(err, ErrAccountExists) {
+			writeJSON(w, http.StatusOK, map[string]string{"status": "exists", "account_id": req.AccountID})
+			return
+		}
+		writeErrorJSON(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 

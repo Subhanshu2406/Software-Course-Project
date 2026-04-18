@@ -54,7 +54,7 @@ echo "  Waiting for shard1 to recover..."
 ELAPSED=0
 RECOVERED=false
 while [ $ELAPSED -lt 60 ]; do
-    STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$SHARD1_URL/health" 2>/dev/null || echo "000")
+    STATUS=$(bash scripts/http_code.sh "$SHARD1_URL/health")
     if [ "$STATUS" = "200" ]; then
         RECOVERED=true
         break

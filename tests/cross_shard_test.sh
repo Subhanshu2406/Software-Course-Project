@@ -43,7 +43,7 @@ for i in $(seq 1 $NUM_TRANSFERS); do
     SRC_IDX=$((RANDOM % 5))
     DST_IDX=$((5 + RANDOM % 5))
     
-    RESP=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$COORDINATOR_URL/submit" \
+    RESP=$(bash scripts/http_code.sh -X POST "$COORDINATOR_URL/submit" \
         -H "Content-Type: application/json" \
         -d "{\"txn_id\":\"xshard-$i\",\"source\":\"user$SRC_IDX\",\"destination\":\"user$DST_IDX\",\"amount\":1}")
     

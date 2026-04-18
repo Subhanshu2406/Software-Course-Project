@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"time"
 
@@ -25,8 +26,21 @@ type ShardClient struct {
 
 // NewShardClient creates a new shard client with the given timeout.
 func NewShardClient(timeout time.Duration) *ShardClient {
+	transport := &http.Transport{
+		Proxy:               http.ProxyFromEnvironment,
+		DialContext:         (&net.Dialer{Timeout: 5 * time.Second, KeepAlive: 30 * time.Second}).DialContext,
+		ForceAttemptHTTP2:   true,
+		MaxIdleConns:        256,
+		MaxIdleConnsPerHost: 128,
+		MaxConnsPerHost:     128,
+		IdleConnTimeout:     90 * time.Second,
+	}
+
 	return &ShardClient{
-		httpClient: &http.Client{Timeout: timeout},
+		httpClient: &http.Client{
+			Timeout:   timeout,
+			Transport: transport,
+		},
 	}
 }
 

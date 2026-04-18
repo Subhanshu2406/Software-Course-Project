@@ -9,7 +9,6 @@ package router
 
 import (
 	"fmt"
-	"log"
 
 	"ledger-service/coordinator/shardmap"
 	"ledger-service/coordinator/twopc"
@@ -39,10 +38,6 @@ func NewRouter(shardMap *shardmap.ShardMap, mapper *utils.PartitionMapper, clien
 // Route processes a transaction by routing it to the correct shard(s).
 // Returns the result of the transaction execution.
 func (r *Router) Route(txn models.Transaction) (models.TransactionResult, error) {
-	// Determine which partition each account belongs to
-	srcPartition := r.mapper.GetPartition(txn.Source)
-	dstPartition := r.mapper.GetPartition(txn.Destination)
-
 	// Resolve shards for each partition
 	srcShard, err := r.shardMap.GetShardForAccount(txn.Source, r.mapper)
 	if err != nil {
@@ -56,13 +51,9 @@ func (r *Router) Route(txn models.Transaction) (models.TransactionResult, error)
 
 	// Route based on whether both accounts are on the same shard
 	if srcShard.ShardID == dstShard.ShardID {
-		log.Printf("router: txn %s → single-shard (shard %s, partitions %d→%d)",
-			txn.TxnID, srcShard.ShardID, srcPartition, dstPartition)
 		return r.executeSingleShard(txn, srcShard)
 	}
 
-	log.Printf("router: txn %s → cross-shard (src shard %s p%d, dst shard %s p%d)",
-		txn.TxnID, srcShard.ShardID, srcPartition, dstShard.ShardID, dstPartition)
 	return r.executeCrossShard(txn, srcShard, dstShard)
 }
 

@@ -19,37 +19,55 @@ if [ "$SUM_ONLY" = false ]; then
 fi
 
 TOTAL=0
+BANK_TOTAL=0
+FAST_PATH=true
 
-for i in $(seq 0 $((NUM_ACCOUNTS - 1))); do
-    ACCOUNT="user$i"
+for URL in $SHARD1_URL $SHARD2_URL $SHARD3_URL; do
+    METRICS=$(curl -s --connect-timeout 2 --max-time 5 "$URL/metrics" 2>/dev/null || echo "")
+    if [ -n "$METRICS" ]; then
+        SHARD_TOTAL=$(echo "$METRICS" | grep -o '"total_balance":[0-9-]*' | head -1 | cut -d: -f2)
+        if [ -n "$SHARD_TOTAL" ]; then
+            TOTAL=$((TOTAL + SHARD_TOTAL))
+            continue
+        fi
+    fi
+    FAST_PATH=false
+    break
+done
+
+if [ "$FAST_PATH" = false ]; then
+    TOTAL=0
+
+    for i in $(seq 0 $((NUM_ACCOUNTS - 1))); do
+        ACCOUNT="user$i"
+        for URL in $SHARD1_URL $SHARD2_URL $SHARD3_URL; do
+            RESP=$(curl -s --connect-timeout 2 --max-time 5 "$URL/balance?account=$ACCOUNT" 2>/dev/null || echo '{"exists":false}')
+            EXISTS=$(echo "$RESP" | grep -o '"exists":true' || echo "")
+            if [ -n "$EXISTS" ]; then
+                BAL=$(echo "$RESP" | grep -o '"balance":[0-9-]*' | cut -d: -f2)
+                if [ -n "$BAL" ]; then
+                    TOTAL=$((TOTAL + BAL))
+                fi
+                break
+            fi
+        done
+
+        if [ "$SUM_ONLY" = false ] && [ $(( (i + 1) % 200 )) -eq 0 ]; then
+            echo "  Checked $((i + 1))/$NUM_ACCOUNTS accounts (running total: $TOTAL)..."
+        fi
+    done
+
     for URL in $SHARD1_URL $SHARD2_URL $SHARD3_URL; do
-        RESP=$(curl -s "$URL/balance?account=$ACCOUNT" 2>/dev/null || echo '{"exists":false}')
+        RESP=$(curl -s --connect-timeout 2 --max-time 5 "$URL/balance?account=__bank__" 2>/dev/null || echo '{"exists":false}')
         EXISTS=$(echo "$RESP" | grep -o '"exists":true' || echo "")
         if [ -n "$EXISTS" ]; then
             BAL=$(echo "$RESP" | grep -o '"balance":[0-9-]*' | cut -d: -f2)
             if [ -n "$BAL" ]; then
-                TOTAL=$((TOTAL + BAL))
+                BANK_TOTAL=$((BANK_TOTAL + BAL))
             fi
-            break
         fi
     done
-    
-    if [ "$SUM_ONLY" = false ] && [ $(( (i + 1) % 200 )) -eq 0 ]; then
-        echo "  Checked $((i + 1))/$NUM_ACCOUNTS accounts (running total: $TOTAL)..."
-    fi
-done
-
-BANK_TOTAL=0
-for URL in $SHARD1_URL $SHARD2_URL $SHARD3_URL; do
-    RESP=$(curl -s "$URL/balance?account=__bank__" 2>/dev/null || echo '{"exists":false}')
-    EXISTS=$(echo "$RESP" | grep -o '"exists":true' || echo "")
-    if [ -n "$EXISTS" ]; then
-        BAL=$(echo "$RESP" | grep -o '"balance":[0-9-]*' | cut -d: -f2)
-        if [ -n "$BAL" ]; then
-            BANK_TOTAL=$((BANK_TOTAL + BAL))
-        fi
-    fi
-done
+fi
 
 GRAND_TOTAL=$((TOTAL + BANK_TOTAL))
 
