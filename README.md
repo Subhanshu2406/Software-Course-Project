@@ -1,4 +1,4 @@
-# High-Concurrency Ledger Service
+# Fault-Tolerant Transaction Ledger
 
 A fault-tolerant, high-throughput, strongly consistent ledger service designed for financial-grade transaction processing under extreme concurrency.
 
